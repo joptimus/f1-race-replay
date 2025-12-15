@@ -494,6 +494,8 @@ class RaceProgressBarComponent(BaseComponent):
         self.height = height
         self.marker_height = marker_height
         
+        self._visible: bool = False
+        
         # Cached data
         self._events: List[dict] = []
         self._total_frames: int = 0
@@ -520,6 +522,21 @@ class RaceProgressBarComponent(BaseComponent):
         self._total_frames = max(1, total_frames)
         self._total_laps = total_laps or 1
         self._events = sorted(events, key=lambda e: e.get("frame", 0))
+    
+    @property
+    def visible(self) -> bool:
+        return self._visible
+    
+    @visible.setter
+    def visible(self, value: bool):
+        self._visible = value
+    
+    def toggle_visibility(self) -> bool:
+        """
+        Toggle the visibility of the progress bar
+        """
+        self._visible = not self._visible
+        return self._visible
         
     def _calculate_bar_dimensions(self, window):
         self._bar_left = self.left_margin
