@@ -4,17 +4,12 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import { useSelectedDriver, useCurrentFrame } from "../store/replayStore";
@@ -54,7 +49,6 @@ export const TelemetryChart: React.FC = () => {
     // Only add new data point if frame time has changed
     if (currentFrame.t !== lastFrameTimeRef.current) {
       const kmhSpeed = currentDriverData.speed;
-      const mphSpeed = kmhSpeed * 0.621371;
 
       const newPoint: TelemetryDataPoint = {
         time: currentFrame.t,
@@ -108,8 +102,7 @@ export const TelemetryChart: React.FC = () => {
 
   const hexColor = `rgb(${selectedDriver.color[0]}, ${selectedDriver.color[1]}, ${selectedDriver.color[2]})`;
   const kmhSpeed = currentDriverData.speed;
-  const mphSpeed = kmhSpeed * 0.621371;
-  const displaySpeed = speedUnit === "kmh" ? kmhSpeed : mphSpeed;
+  const displaySpeed = speedUnit === "kmh" ? kmhSpeed : kmhSpeed * 0.621371;
   const speedLabel = speedUnit === "kmh" ? "km/h" : "mph";
 
   // Handle brake/throttle that might be 0-1 or 0-100
@@ -179,7 +172,7 @@ export const TelemetryChart: React.FC = () => {
       <div>
         <h4 className="text-sm font-medium text-gray-300 mb-2">Speed</h4>
         <ResponsiveContainer width="100%" height={150}>
-          <AreaChart data={telemetryData} isAnimationActive={true}>
+          <AreaChart data={telemetryData}>
             <defs>
               <linearGradient
                 id="colorSpeed"
@@ -209,7 +202,6 @@ export const TelemetryChart: React.FC = () => {
               stroke={hexColor}
               fillOpacity={1}
               fill="url(#colorSpeed)"
-              isAnimationActive={true}
               animationDuration={600}
               animationEasing="ease-out"
             />

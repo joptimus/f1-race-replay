@@ -11,7 +11,7 @@ export const TrackVisualization3D: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
   const driverMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const driverLabelsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const initRef = useRef(false);
