@@ -36,8 +36,40 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function checkPortInUse(port) {
+  try {
+    if (os.platform() === 'win32') {
+      const output = execSync(`netstat -ano | find ":${port}"`, {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+      });
+      return output.includes(':' + port);
+    } else {
+      execSync(`lsof -i :${port}`, { stdio: 'pipe' });
+      return true;
+    }
+  } catch {
+    return false;
+  }
+}
+
 async function cleanupProcesses() {
-  log(colors.cyan, 'CLEANUP', 'Cleaning up existing processes...');
+  const portsToCheck = [8000, 5173, 3000];
+  const usedPorts = [];
+
+  for (const port of portsToCheck) {
+    if (await checkPortInUse(port)) {
+      usedPorts.push(port);
+    }
+  }
+
+  if (usedPorts.length === 0) {
+    log(colors.green, 'CLEANUP', 'All ports are free - skipping cleanup');
+    return;
+  }
+
+  log(colors.yellow, 'CLEANUP', `Ports in use: ${usedPorts.join(', ')}`);
+  log(colors.cyan, 'CLEANUP', 'Cleaning up processes on those ports...');
 
   try {
     if (os.platform() === 'win32') {
@@ -49,16 +81,17 @@ async function cleanupProcesses() {
         });
       }
     } else {
-      execSync('pkill -f "python.*main.py" 2>/dev/null; pkill -f "node.*dev" 2>/dev/null; true', {
+      execSync('lsof -ti :8000 | xargs kill -9 2>/dev/null; lsof -ti :5173 | xargs kill -9 2>/dev/null; lsof -ti :3000 | xargs kill -9 2>/dev/null; true', {
         stdio: 'pipe',
+        shell: '/bin/bash',
       });
     }
     log(colors.green, 'CLEANUP', 'Process cleanup complete');
   } catch (error) {
-    log(colors.yellow, 'CLEANUP', 'Cleanup script not available or failed - continuing startup');
+    log(colors.yellow, 'CLEANUP', 'Cleanup script failed - continuing startup');
   }
 
-  await sleep(2000);
+  await sleep(1000);
 }
 
 async function checkDependencies() {
