@@ -82,7 +82,7 @@ export const TrackVisualization3D: React.FC<{ onSessionTypeChange?: (year: numbe
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
-  const driverMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
+  const driverMeshesRef = useRef<Map<string, THREE.Mesh | THREE.Group>>(new Map());
   const driverLabelsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const sectorLabelsRef = useRef<HTMLDivElement[]>([]);
   const trackMeshRef = useRef<THREE.Mesh | null>(null);
@@ -710,28 +710,72 @@ try {
       let mesh = driverMeshesRef.current.get(code);
 
       if (!mesh) {
-        const sphereGeometry = new THREE.SphereGeometry(80, 16, 16);
+        const group = new THREE.Group();
+
+        // Main driver sphere with improved material
+        const sphereGeometry = new THREE.SphereGeometry(80, 32, 32);
         const color = new THREE.Color(hexColor);
         const material = new THREE.MeshStandardMaterial({
           color,
           emissive: color,
-          emissiveIntensity: 0.5,
+          emissiveIntensity: 0.6,
+          metalness: 0.7,
+          roughness: 0.2,
         });
-        mesh = new THREE.Mesh(sphereGeometry, material);
-        scene.add(mesh);
-        driverMeshesRef.current.set(code, mesh);
+        const sphere = new THREE.Mesh(sphereGeometry, material);
+        group.add(sphere);
+
+        // Outer glow ring
+        const ringGeometry = new THREE.TorusGeometry(95, 8, 16, 32);
+        const ringMaterial = new THREE.MeshStandardMaterial({
+          color,
+          emissive: color,
+          emissiveIntensity: 0.4,
+          metalness: 0.5,
+          roughness: 0.3,
+        });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.position.y = 0;
+        ring.rotation.x = Math.PI / 3;
+        group.add(ring);
+
+        // Highlight point
+        const highlightGeometry = new THREE.SphereGeometry(40, 16, 16);
+        const highlightMaterial = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: 0xffffff,
+          emissiveIntensity: 0.8,
+          metalness: 0.9,
+          roughness: 0.1,
+        });
+        const highlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+        highlight.position.set(-30, 30, -30);
+        group.add(highlight);
+
+        scene.add(group);
+        driverMeshesRef.current.set(code, group);
+        mesh = group;
       }
 
       mesh.position.set(x, 50, y);
 
-      const material = mesh.material as THREE.MeshStandardMaterial;
       const isSelected = code === selectedDriver?.code;
-      if (isSelected) {
-        material.emissiveIntensity = 1;
-        mesh.scale.set(1.5, 1.5, 1.5);
-      } else {
-        material.emissiveIntensity = 0.5;
-        mesh.scale.set(1, 1, 1);
+      if (mesh instanceof THREE.Group && mesh.children.length > 0) {
+        const mainMaterial = (mesh.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
+        const ringMaterial = mesh.children.length > 1 ? (mesh.children[1] as THREE.Mesh).material as THREE.MeshStandardMaterial : null;
+        const highlightMaterial = mesh.children.length > 2 ? (mesh.children[2] as THREE.Mesh).material as THREE.MeshStandardMaterial : null;
+
+        if (isSelected) {
+          mainMaterial.emissiveIntensity = 0.9;
+          if (ringMaterial) ringMaterial.emissiveIntensity = 0.7;
+          if (highlightMaterial) highlightMaterial.emissiveIntensity = 1.0;
+          mesh.scale.set(1.4, 1.4, 1.4);
+        } else {
+          mainMaterial.emissiveIntensity = 0.6;
+          if (ringMaterial) ringMaterial.emissiveIntensity = 0.4;
+          if (highlightMaterial) highlightMaterial.emissiveIntensity = 0.8;
+          mesh.scale.set(1, 1, 1);
+        }
       }
 
       if (isSelected) {
