@@ -266,7 +266,7 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                 </button>
                 <button
                   onClick={handleSelect}
-                  disabled={isLoading || !availableRounds.includes(selectedRound)}
+                  disabled={isLoading}
                   style={{
                     flex: 1,
                     padding: "12px 16px",
