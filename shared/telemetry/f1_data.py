@@ -103,10 +103,11 @@ def _process_single_driver(args):
         rpm_all.append(rpm_lap)
 
         # Add lap time and sector times (same value for all points in this lap)
-        lap_times_all.append(np.full_like(t_lap, lap_time, dtype=object))
-        sector1_all.append(np.full_like(t_lap, sector1, dtype=object))
-        sector2_all.append(np.full_like(t_lap, sector2, dtype=object))
-        sector3_all.append(np.full_like(t_lap, sector3, dtype=object))
+        # Use float with NaN for missing values to enable numpy interpolation
+        lap_times_all.append(np.full_like(t_lap, lap_time if lap_time is not None else np.nan, dtype=float))
+        sector1_all.append(np.full_like(t_lap, sector1 if sector1 is not None else np.nan, dtype=float))
+        sector2_all.append(np.full_like(t_lap, sector2 if sector2 is not None else np.nan, dtype=float))
+        sector3_all.append(np.full_like(t_lap, sector3 if sector3 is not None else np.nan, dtype=float))
 
     if not t_all:
         return None
@@ -240,6 +241,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
 
     grid_positions = {}
     final_positions = {}
+    driver_statuses = {}
     try:
         results = session.results
         for _, row in results.iterrows():
@@ -248,6 +250,9 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             # Also get final race positions
             if "Position" in results.columns:
                 final_positions[code] = int(row["Position"])
+            # Get retirement status
+            if "Status" in results.columns:
+                driver_statuses[code] = row["Status"]
     except Exception as e:
         print(f"Warning: Could not get grid/final positions: {e}")
 
@@ -359,6 +364,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     track_status = session.track_status
 
     formatted_track_statuses = []
+    race_start_time = None
 
     for status in track_status.to_dict('records'):
         seconds = timedelta.total_seconds(status['Time'])
@@ -374,8 +380,12 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         formatted_track_statuses.append({
             'status': status['Status'],
             'start_time': start_time,
-            'end_time': end_time, 
+            'end_time': end_time,
         })
+
+        # Record race start as first "All Clear" status (status code "1")
+        if race_start_time is None and status['Status'] == "1":
+            race_start_time = start_time
 
     # 4.1. Resample weather data onto the same timeline for playback
     weather_resampled = None
@@ -448,6 +458,12 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         rel = np.clip(d["rel_dist"], 0.0, 1.0)  # Clamp rel_dist to [0,1]
         race_progress_all[code] = (lap - 1) * circuit_length + rel * circuit_length
 
+    # Track retirement confirmation: driver must have speed=0 for at least 10 seconds
+    # to be marked as retired (avoids false positives from pit stops or pauses)
+    RETIREMENT_THRESHOLD = 10  # seconds with speed == 0
+    driver_zero_speed_time = defaultdict(float)  # Track continuous zero-speed duration per driver
+    driver_retired = defaultdict(bool)  # Track confirmed retirement status
+
     for i in range(num_frames):
         t = timeline[i]
 
@@ -458,6 +474,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         for code in driver_codes:
             d = driver_arrays[code]
             race_prog = race_progress_all[code][i]
+            speed = float(d['speed'][i])
 
             frame_data_raw[code] = {
                 "x": float(d["x"][i]),
@@ -467,7 +484,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 "rel_dist": float(d["rel_dist"][i]),
                 "race_progress": float(race_prog),
                 "tyre": int(d["tyre"][i]),
-                "speed": float(d['speed'][i]),
+                "speed": speed,
                 "gear": int(d['gear'][i]),
                 "drs": int(d['drs'][i]),
                 "throttle": float(d['throttle'][i]),
@@ -477,8 +494,17 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 "sector1": float(d["sector1"][i]) if not np.isnan(d["sector1"][i]) else None,
                 "sector2": float(d["sector2"][i]) if not np.isnan(d["sector2"][i]) else None,
                 "sector3": float(d["sector3"][i]) if not np.isnan(d["sector3"][i]) else None,
+                "status": driver_statuses.get(code, "Finished"),
             }
             distances[code] = frame_data_raw[code]["dist"]
+
+            # Track retirement: update zero-speed duration
+            if speed == 0:
+                driver_zero_speed_time[code] += DT
+                if driver_zero_speed_time[code] >= RETIREMENT_THRESHOLD:
+                    driver_retired[code] = True
+            else:
+                driver_zero_speed_time[code] = 0  # Reset if driver has any speed
 
         # Determine sorting order based on race state
         # (Use precomputed frame_data_raw for state checks)
@@ -491,32 +517,39 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         if max_rel_dist >= 0.99 and final_positions:
             race_finished = True
 
+        # Separate active drivers from OUT drivers
+        # A driver is OUT if: (1) confirmed retired (speed=0 for 10s+) OR (2) rel_dist >= 0.99 (completed/finished)
+        active_codes = [code for code in driver_codes if not driver_retired[code] and frame_data_raw[code].get("rel_dist", 0.0) < 0.99]
+        out_codes = [code for code in driver_codes if driver_retired[code] or frame_data_raw[code].get("rel_dist", 0.0) >= 0.99]
+
         # Determine ordering and assign positions
         if is_race_start and grid_positions:
             # Use grid position primarily, race_progress as tiebreaker
-            sorted_codes = sorted(
-                driver_codes,
-                key=lambda code: (grid_positions.get(code, 999), -frame_data_raw[code]["race_progress"])
-            )
+            active_codes.sort(key=lambda code: (grid_positions.get(code, 999), -frame_data_raw[code]["race_progress"]))
+            out_codes.sort(key=lambda code: (grid_positions.get(code, 999), -frame_data_raw[code]["race_progress"]))
         elif race_finished and final_positions:
             # Once race is finished, always use official final race positions
-            sorted_codes = sorted(
-                driver_codes,
-                key=lambda code: final_positions.get(code, 999)
-            )
+            active_codes.sort(key=lambda code: final_positions.get(code, 999))
+            out_codes.sort(key=lambda code: final_positions.get(code, 999))
         else:
             # During the race, sort by accumulated race progress
             # Higher race_progress = more distance covered = ahead
-            sorted_codes = sorted(
-                driver_codes,
-                key=lambda code: -frame_data_raw[code]["race_progress"]
-            )
+            active_codes.sort(key=lambda code: -frame_data_raw[code]["race_progress"])
+            out_codes.sort(key=lambda code: -frame_data_raw[code]["race_progress"])
+
+        # Active drivers get positions 1..N, OUT drivers go after
+        sorted_codes = active_codes + out_codes
 
         # Assign positions and check monotonicity
         frame_data = {}
-        for position, code in enumerate(sorted_codes, 1):
+        for code in sorted_codes:
             frame_data[code] = frame_data_raw[code].copy()
-            frame_data[code]["position"] = position
+            # Only give race positions to active drivers
+            if code in active_codes:
+                frame_data[code]["position"] = active_codes.index(code) + 1
+            else:
+                # OUT drivers get positions after all active drivers
+                frame_data[code]["position"] = len(active_codes) + out_codes.index(code) + 1
 
             # Check distance monotonicity per driver (warns if data is non-monotonic)
             progress = frame_data[code]["race_progress"]
@@ -570,6 +603,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             "driver_colors": get_driver_colors(session),
             "track_statuses": formatted_track_statuses,
             "total_laps": int(max_lap_number),
+            "race_start_time": race_start_time,
         }, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     print("Saved Successfully!")
@@ -579,6 +613,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         "driver_colors": get_driver_colors(session),
         "track_statuses": formatted_track_statuses,
         "total_laps": int(max_lap_number),
+        "race_start_time": race_start_time,
     }
 
 

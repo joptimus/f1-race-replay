@@ -20,6 +20,7 @@ export interface DriverData {
   sector1?: number | null;
   sector2?: number | null;
   sector3?: number | null;
+  status?: string;
 }
 
 export interface FrameData {
@@ -69,6 +70,7 @@ export interface SessionMetadata {
   driver_colors: Record<string, [number, number, number]>;
   track_geometry?: TrackGeometry;
   track_statuses?: TrackStatus[];
+  race_start_time?: number;
   error?: string;
 }
 

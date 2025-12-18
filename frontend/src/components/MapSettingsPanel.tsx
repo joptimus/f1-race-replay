@@ -11,6 +11,8 @@ interface MapSettingsPanelProps {
   onToggleWeatherPanel: () => void;
   temperatureUnit: 'C' | 'F';
   onToggleTemperatureUnit: () => void;
+  enableWeatherFx: boolean;
+  onToggleWeatherFx: () => void;
 }
 
 export const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({
@@ -22,6 +24,8 @@ export const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({
   onToggleWeatherPanel,
   temperatureUnit,
   onToggleTemperatureUnit,
+  enableWeatherFx,
+  onToggleWeatherFx,
 }) => {
   return (
     <AnimatePresence>
@@ -259,6 +263,56 @@ export const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({
                       °F
                     </button>
                   </div>
+                </div>
+
+                {/* Weather FX Toggle */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px',
+                    background: '#111318',
+                    border: '1px solid #374151',
+                    borderRadius: '6px',
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#d1d5db',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Weather FX
+                  </label>
+                  <button
+                    onClick={onToggleWeatherFx}
+                    style={{
+                      background: enableWeatherFx ? '#10b981' : '#4b5563',
+                      border: 'none',
+                      borderRadius: '12px',
+                      width: '44px',
+                      height: '24px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '2px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '10px',
+                        background: 'white',
+                        transform: enableWeatherFx ? 'translateX(20px)' : 'translateX(0)',
+                        transition: 'transform 0.2s ease',
+                      }}
+                    />
+                  </button>
                 </div>
               </div>
             </div>

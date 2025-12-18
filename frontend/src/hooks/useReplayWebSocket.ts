@@ -16,7 +16,8 @@ interface WebSocketMessage {
 
 export const useReplayWebSocket = (sessionId: string | null) => {
   const wsRef = useRef<WebSocket | null>(null);
-  const { currentFrame, setCurrentFrame, playback } = useReplayStore();
+  const setCurrentFrame = useReplayStore((state) => state.setCurrentFrame);
+  const playback = useReplayStore((state) => state.playback);
   const lastSentCommandRef = useRef<WebSocketMessage | null>(null);
 
   // Send control commands to server
@@ -128,7 +129,6 @@ export const useReplayWebSocket = (sessionId: string | null) => {
 
   return {
     isConnected: wsRef.current?.readyState === WebSocket.OPEN,
-    currentFrame,
     sendSeek: (frameIndex: number) => {
       sendCommand({ action: "seek", frame: frameIndex });
     },

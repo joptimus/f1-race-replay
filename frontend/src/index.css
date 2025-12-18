@@ -34,11 +34,13 @@ html, body, #root {
 
 .app-container {
   display: grid;
-  grid-template-columns: 330px 1fr 390px;
+  grid-template-columns: 280px 1fr 390px;
   grid-template-rows: 60px calc(100vh - 60px);
   height: 100vh;
   gap: 10px;
   padding: 0 10px 10px 10px;
+  flex: 1;
+  overflow: hidden;
 }
 
 /* --- HEADER --- */
@@ -192,11 +194,11 @@ html, body, #root {
   align-items: center;
   background: var(--f1-dark-gray);
   margin-bottom: 1px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   cursor: pointer;
   transition: background 0.2s ease;
-  height: 32px;
-  min-height: 32px;
+  height: 40px;
+  min-height: 40px;
   flex-shrink: 0;
 }
 

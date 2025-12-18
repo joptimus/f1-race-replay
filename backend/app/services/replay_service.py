@@ -25,6 +25,7 @@ class F1ReplaySession:
         self.driver_teams = {}
         self.total_laps = 0
         self.track_statuses = []
+        self.race_start_time = None
         self.track_geometry = None
         self.is_loaded = False
         self.load_error = None
@@ -50,6 +51,7 @@ class F1ReplaySession:
                 self.driver_colors = data.get("driver_colors", {})
                 self.track_statuses = data.get("track_statuses", [])
                 self.total_laps = data.get("total_laps", 0)
+                self.race_start_time = data.get("race_start_time")
 
             self.driver_numbers = self._extract_driver_numbers(session)
             self.driver_teams = self._extract_driver_teams(session)
@@ -157,6 +159,7 @@ class F1ReplaySession:
                 "sector1": safe_float(driver_data.get("sector1")) if driver_data.get("sector1") is not None else None,
                 "sector2": safe_float(driver_data.get("sector2")) if driver_data.get("sector2") is not None else None,
                 "sector3": safe_float(driver_data.get("sector3")) if driver_data.get("sector3") is not None else None,
+                "status": driver_data.get("status", "Running"),
             }
 
         if "weather" in frame:
@@ -202,6 +205,7 @@ class F1ReplaySession:
                 "sector1": safe_float(driver_data.get("sector1")) if driver_data.get("sector1") is not None else None,
                 "sector2": safe_float(driver_data.get("sector2")) if driver_data.get("sector2") is not None else None,
                 "sector3": safe_float(driver_data.get("sector3")) if driver_data.get("sector3") is not None else None,
+                "status": driver_data.get("status", "Running"),
             }
 
         if "weather" in frame:
@@ -271,5 +275,7 @@ class F1ReplaySession:
             "driver_numbers": self.driver_numbers,
             "driver_teams": self.driver_teams,
             "track_geometry": self.track_geometry,
+            "track_statuses": self.track_statuses,
+            "race_start_time": self.race_start_time,
             "error": self.load_error,
         }

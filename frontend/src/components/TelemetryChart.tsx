@@ -81,7 +81,7 @@ export const TelemetryChart: React.FC = () => {
         setTelemetryData([...telemetryHistoryRef.current]);
       }
     }
-  }, [currentFrame?.t, selectedDriver?.code]);
+  }, [currentFrame, selectedDriver?.code]);
 
   useEffect(() => {
     if (telemetryHistoryRef.current.length === 0) return;
@@ -111,7 +111,7 @@ export const TelemetryChart: React.FC = () => {
           fontWeight: 600,
           letterSpacing: '0.05em',
           margin: 0,
-        }}>NO TELEMETRY DATA</p>
+        }}>NO DRIVER SELECTED</p>
       </div>
     );
   }
@@ -136,7 +136,7 @@ export const TelemetryChart: React.FC = () => {
           fontWeight: 600,
           letterSpacing: '0.05em',
           margin: 0,
-        }}>NO TELEMETRY DATA</p>
+        }}>LOADING DATA...</p>
       </div>
     );
   }
