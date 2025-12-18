@@ -5,8 +5,9 @@
  * One-command startup for both backend (FastAPI) and frontend (React)
  *
  * Usage:
- *   node dev.js           - Install dependencies and start both servers
- *   node dev.js --no-open - Start servers without opening browser
+ *   npm start             - Run kill_all.bat cleanup, then start servers
+ *   node scripts/dev.js           - Install dependencies and start both servers
+ *   node scripts/dev.js --no-open - Start servers without opening browser
  */
 
 const { spawn, execSync } = require('child_process');
@@ -14,7 +15,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const ROOT_DIR = __dirname;
+const ROOT_DIR = path.dirname(__dirname);
 const BACKEND_DIR = path.join(ROOT_DIR, 'backend');
 const FRONTEND_DIR = path.join(ROOT_DIR, 'frontend');
 const SCRIPTS_DIR = path.join(ROOT_DIR, 'scripts');
@@ -34,64 +35,6 @@ function log(color, label, message) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function checkPortInUse(port) {
-  try {
-    if (os.platform() === 'win32') {
-      const output = execSync(`netstat -ano | find ":${port}"`, {
-        stdio: 'pipe',
-        encoding: 'utf-8',
-      });
-      return output.includes(':' + port);
-    } else {
-      execSync(`lsof -i :${port}`, { stdio: 'pipe' });
-      return true;
-    }
-  } catch {
-    return false;
-  }
-}
-
-async function cleanupProcesses() {
-  const portsToCheck = [8000, 5173, 3000];
-  const usedPorts = [];
-
-  for (const port of portsToCheck) {
-    if (await checkPortInUse(port)) {
-      usedPorts.push(port);
-    }
-  }
-
-  if (usedPorts.length === 0) {
-    log(colors.green, 'CLEANUP', 'All ports are free - skipping cleanup');
-    return;
-  }
-
-  log(colors.yellow, 'CLEANUP', `Ports in use: ${usedPorts.join(', ')}`);
-  log(colors.cyan, 'CLEANUP', 'Cleaning up processes on those ports...');
-
-  try {
-    if (os.platform() === 'win32') {
-      const killScript = path.join(SCRIPTS_DIR, 'kill_all.bat');
-      if (fs.existsSync(killScript)) {
-        execSync(`"${killScript}"`, {
-          stdio: 'pipe',
-          timeout: 20000,
-        });
-      }
-    } else {
-      execSync('lsof -ti :8000 | xargs kill -9 2>/dev/null; lsof -ti :5173 | xargs kill -9 2>/dev/null; lsof -ti :3000 | xargs kill -9 2>/dev/null; true', {
-        stdio: 'pipe',
-        shell: '/bin/bash',
-      });
-    }
-    log(colors.green, 'CLEANUP', 'Process cleanup complete');
-  } catch (error) {
-    log(colors.yellow, 'CLEANUP', 'Cleanup script failed - continuing startup');
-  }
-
-  await sleep(1000);
 }
 
 async function checkDependencies() {
@@ -214,7 +157,6 @@ ${colors.green}║           F1 Race Replay - Development Server              �
 ${colors.green}╚═══════════════════════════════════════════════════════════╝${colors.reset}
   `);
 
-  await cleanupProcesses();
   await checkDependencies();
   await installBackendDependencies();
   await installFrontendDependencies();
