@@ -4,18 +4,24 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Settings, Upload } from "lucide-react";
+import { X, Settings, Upload, RefreshCw, Palette } from "lucide-react";
 
 interface SidebarMenuProps {
   isOpen: boolean;
   onClose: () => void;
   onLoadSession?: () => void;
+  onRefreshData?: () => void;
+  showSectorColors?: boolean;
+  onToggleSectorColors?: () => void;
 }
 
 export const SidebarMenu: React.FC<SidebarMenuProps> = ({
   isOpen,
   onClose,
   onLoadSession,
+  onRefreshData,
+  showSectorColors,
+  onToggleSectorColors,
 }) => {
   return (
     <AnimatePresence>
@@ -133,6 +139,84 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
                   >
                     <Upload size={18} />
                     <span>Load Season</span>
+                  </button>
+                )}
+
+                {/* Refresh Data */}
+                {onRefreshData && (
+                  <button
+                    onClick={() => {
+                      onRefreshData();
+                      onClose();
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      padding: "12px 16px",
+                      borderRadius: "6px",
+                      border: "1px solid #374151",
+                      background: "#111318",
+                      color: "#d1d5db",
+                      cursor: "pointer",
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                      transition: "all 0.2s ease",
+                      width: "100%",
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as any).style.background = "#1f1f27";
+                      (e.currentTarget as any).style.borderColor = "#4b5563";
+                      (e.currentTarget as any).style.color = "#f3f4f6";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as any).style.background = "#111318";
+                      (e.currentTarget as any).style.borderColor = "#374151";
+                      (e.currentTarget as any).style.color = "#d1d5db";
+                    }}
+                  >
+                    <RefreshCw size={18} />
+                    <span>Refresh Data</span>
+                  </button>
+                )}
+
+                {/* Toggle Sector Colors */}
+                {onToggleSectorColors && (
+                  <button
+                    onClick={() => {
+                      onToggleSectorColors();
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      padding: "12px 16px",
+                      borderRadius: "6px",
+                      border: `1px solid ${showSectorColors ? "#4b5563" : "#374151"}`,
+                      background: showSectorColors ? "#1a3a3a" : "#111318",
+                      color: showSectorColors ? "#00e5ff" : "#d1d5db",
+                      cursor: "pointer",
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                      transition: "all 0.2s ease",
+                      width: "100%",
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as any).style.background = "#1f1f27";
+                      (e.currentTarget as any).style.borderColor = "#4b5563";
+                      (e.currentTarget as any).style.color = "#f3f4f6";
+                    }}
+                    onMouseLeave={(e) => {
+                      const active = showSectorColors;
+                      (e.currentTarget as any).style.background = active ? "#1a3a3a" : "#111318";
+                      (e.currentTarget as any).style.borderColor = active ? "#4b5563" : "#374151";
+                      (e.currentTarget as any).style.color = active ? "#00e5ff" : "#d1d5db";
+                    }}
+                  >
+                    <Palette size={18} />
+                    <span>{showSectorColors ? "Sector Colors ON" : "Sector Colors OFF"}</span>
                   </button>
                 )}
 

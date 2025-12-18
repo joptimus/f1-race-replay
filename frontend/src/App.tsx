@@ -2,7 +2,7 @@
  * Main App component for F1 Race Replay
  */
 import { useEffect, useState } from "react";
-import { useReplayStore, useSelectedDriver, useCurrentFrame } from "./store/replayStore";
+import { useReplayStore, useSelectedDriver, useCurrentFrame, useSectorColors } from "./store/replayStore";
 import { useReplayWebSocket } from "./hooks/useReplayWebSocket";
 import { TrackVisualization3D } from "./components/TrackVisualization3D";
 import { PlaybackControls } from "./components/PlaybackControls";
@@ -11,6 +11,7 @@ import { TelemetryChart } from "./components/TelemetryChart";
 import { SidebarMenu } from "./components/SidebarMenu";
 import { SessionSelector } from "./components/SessionSelector";
 import { LoadingModal } from "./components/LoadingModal";
+import { LandingPage } from "./components/LandingPage";
 import { motion } from "framer-motion";
 import { dataService } from "./services/dataService";
 
@@ -39,6 +40,7 @@ const DriverHero = ({ year }: { year?: number }) => {
   const accessibleColor = `rgb(${Math.max(0, color[0] - 80)}, ${Math.max(0, color[1] - 80)}, ${Math.max(0, color[2] - 80)})`;
   const driverNum = DRIVER_NUMBERS[code] || "0";
   const fullName = year ? dataService.getDriverFullName(year, code) : code;
+  const displayYear = year || 2025;
 
   return (
     <motion.div
@@ -65,7 +67,7 @@ const DriverHero = ({ year }: { year?: number }) => {
 
         {/* Number Image */}
         <img
-          src={`/images/numbers/2025/${driverNum}.avif`}
+          src={`/images/numbers/${displayYear}/${driverNum}.avif`}
           alt={`Driver ${driverNum}`}
           style={{
             height: '60px',
@@ -84,7 +86,7 @@ const DriverHero = ({ year }: { year?: number }) => {
       <div className="f1-card-photo-wrapper">
         <div className="f1-card-photo-inner">
           <img
-            src={`/images/drivers/2025/${code.toUpperCase()}.avif`}
+            src={`/images/drivers/${displayYear}/${code.toUpperCase()}.avif`}
             alt={code}
             onError={(e) => (e.currentTarget.style.display = 'none')}
           />
@@ -98,26 +100,17 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loadingSessionYear, setLoadingSessionYear] = useState(0);
   const [loadingSessionRound, setLoadingSessionRound] = useState(0);
-  const { session, setSession, setSessionLoading, pause } = useReplayStore();
+  const [sessionSelected, setSessionSelected] = useState(false);
+  const { session, setSession, setSessionLoading, pause, setTotalFrames } = useReplayStore();
   const currentFrame = useCurrentFrame();
   const { isConnected } = useReplayWebSocket(session.sessionId);
 
+  // Update total frames when session metadata changes
   useEffect(() => {
-    const loadDefaultSession = async () => {
-      try {
-        setSessionLoading(true);
-        const response = await fetch("/api/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ year: 2025, round_num: 12, session_type: "R" })
-        });
-        const data = await response.json();
-        setSession(data.session_id, data.metadata);
-        pollSessionStatus(data.session_id);
-      } catch (err) { console.error(err); }
-    };
-    loadDefaultSession();
-  }, [setSession, setSessionLoading]);
+    if (session.metadata?.total_frames) {
+      setTotalFrames(session.metadata.total_frames);
+    }
+  }, [session.metadata?.total_frames, setTotalFrames]);
 
   // Poll for session status until data is loaded
   const pollSessionStatus = async (sessionId: string) => {
@@ -151,26 +144,41 @@ function App() {
     poll();
   };
 
-  const handleSessionSelect = async (year: number, round: number) => {
+  const handleSessionSelect = async (year: number, round: number, refresh: boolean = false) => {
     try {
-      pause(); // Pause playback
+      if (session.sessionId) {
+        pause();
+      }
       setLoadingSessionYear(year);
       setLoadingSessionRound(round);
       setSessionLoading(true);
+      setSessionSelected(true);
 
       const response = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ year, round_num: round, session_type: "R" })
+        body: JSON.stringify({ year, round_num: round, session_type: "R", refresh })
       });
       const data = await response.json();
       setSession(data.session_id, data.metadata);
+      // Keep loading state true while we poll for completion
+      setSessionLoading(true);
       pollSessionStatus(data.session_id);
     } catch (err) {
       console.error("Failed to load session:", err);
       setSessionLoading(false);
     }
   };
+
+  const handleRefreshData = async () => {
+    if (session.metadata?.year && session.metadata?.round) {
+      handleSessionSelect(session.metadata.year, session.metadata.round, true);
+    }
+  };
+
+  if (!sessionSelected) {
+    return <LandingPage onSessionSelect={handleSessionSelect} isLoading={session.isLoading} />;
+  }
 
   const weather = currentFrame?.weather;
   const year = session.metadata?.year;
@@ -250,9 +258,11 @@ function App() {
         <Leaderboard />
       </aside>
 
-      <main style={{ position: 'relative', background: 'var(--f1-carbon)', border: '1px solid var(--f1-border)', borderRadius: '8px', overflow: 'hidden' }}>
-        <TrackVisualization3D />
-        <div style={{ position: 'absolute', bottom: '20px', left: '20px', right: '20px', zIndex: 10 }}>
+      <main style={{ position: 'relative', background: 'var(--f1-carbon)', border: '1px solid var(--f1-border)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <TrackVisualization3D />
+        </div>
+        <div style={{ borderTop: '1px solid var(--f1-border)' }}>
           <PlaybackControls />
         </div>
       </main>
@@ -267,6 +277,9 @@ function App() {
       <SidebarMenu
         isOpen={menuOpen}
         onClose={() => setMenuOpen(false)}
+        onRefreshData={handleRefreshData}
+        showSectorColors={useSectorColors().isEnabled}
+        onToggleSectorColors={useSectorColors().toggle}
       />
 
       <LoadingModal

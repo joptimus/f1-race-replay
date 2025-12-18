@@ -44,6 +44,10 @@ interface ReplayStore {
   // UI state
   showTelemetryChart: boolean;
   toggleTelemetryChart: () => void;
+
+  // Sector colors visibility
+  showSectorColors: boolean;
+  toggleSectorColors: () => void;
 }
 
 export const useReplayStore = create<ReplayStore>()(
@@ -137,6 +141,13 @@ export const useReplayStore = create<ReplayStore>()(
       set((state) => ({
         showTelemetryChart: !state.showTelemetryChart,
       })),
+
+    // Sector colors
+    showSectorColors: true,
+    toggleSectorColors: () =>
+      set((state) => ({
+        showSectorColors: !state.showSectorColors,
+      })),
   }))
 );
 
@@ -165,4 +176,10 @@ export const useLeaderboard = () =>
   useReplayStore((state) => ({
     isVisible: state.showLeaderboard,
     toggle: state.toggleLeaderboard,
+  }));
+
+export const useSectorColors = () =>
+  useReplayStore((state) => ({
+    isEnabled: state.showSectorColors,
+    toggle: state.toggleSectorColors,
   }));

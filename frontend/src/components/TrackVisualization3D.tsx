@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { useCurrentFrame, useSelectedDriver, useSessionMetadata } from "../store/replayStore";
+import { useCurrentFrame, useSelectedDriver, useSessionMetadata, useSectorColors } from "../store/replayStore";
 
 function findSectorBoundaryIndices(sectors: number[] | undefined): { s1: number; s2: number } | null {
   if (!sectors || sectors.length === 0) return null;
@@ -35,10 +35,13 @@ export const TrackVisualization3D: React.FC = () => {
   const driverMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const driverLabelsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const sectorLabelsRef = useRef<HTMLDivElement[]>([]);
+  const trackMeshRef = useRef<THREE.Mesh | null>(null);
+  const trackMaterialColorsRef = useRef<Float32Array | null>(null);
   const initRef = useRef(false);
   const currentFrame = useCurrentFrame();
   const selectedDriver = useSelectedDriver();
   const sessionMetadata = useSessionMetadata();
+  const { isEnabled: showSectorColors } = useSectorColors();
 
   // Setup scene and track (only once)
   useEffect(() => {
@@ -219,6 +222,9 @@ export const TrackVisualization3D: React.FC = () => {
         const trackMesh = new THREE.Mesh(trackGeom, trackMaterial);
         trackMesh.position.z = -1;
         trackGroup.add(trackMesh);
+
+        trackMeshRef.current = trackMesh;
+        trackMaterialColorsRef.current = new Float32Array(colors);
       }
 
       // Create outer track edge as a thick LINE using TubeGeometry
@@ -427,6 +433,27 @@ export const TrackVisualization3D: React.FC = () => {
       }
     });
   }, [currentFrame, selectedDriver, sessionMetadata?.driver_colors]);
+
+  // Handle sector colors toggle
+  useEffect(() => {
+    if (!trackMeshRef.current || !trackMaterialColorsRef.current) return;
+
+    const colorAttribute = trackMeshRef.current.geometry.getAttribute("color") as THREE.BufferAttribute;
+    if (!colorAttribute) return;
+
+    if (showSectorColors) {
+      colorAttribute.array = trackMaterialColorsRef.current;
+    } else {
+      const grayColors = new Float32Array(trackMaterialColorsRef.current.length);
+      const grayValue = 0.3;
+      for (let i = 0; i < grayColors.length; i++) {
+        grayColors[i] = grayValue;
+      }
+      colorAttribute.array = grayColors;
+    }
+
+    colorAttribute.needsUpdate = true;
+  }, [showSectorColors]);
 
   return (
     <div
