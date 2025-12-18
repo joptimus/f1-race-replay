@@ -137,6 +137,12 @@ export const useReplayWebSocket = (sessionId: string | null) => {
 
   // Sync playback state to WebSocket
   useEffect(() => {
+    // Only send playback commands if WebSocket is connected
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log("[WS Client] Playback sync skipped - WebSocket not ready, state:", wsRef.current?.readyState);
+      return;
+    }
+
     if (playback.isPlaying) {
       sendCommand({
         action: "play",
@@ -149,6 +155,12 @@ export const useReplayWebSocket = (sessionId: string | null) => {
 
   // Sync frame index (seeking) to WebSocket
   useEffect(() => {
+    // Only send seek commands if WebSocket is connected
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log("[WS Client] Seek sync skipped - WebSocket not ready, state:", wsRef.current?.readyState);
+      return;
+    }
+
     sendCommand({ action: "seek", frame: playback.frameIndex });
   }, [playback.frameIndex, sendCommand]);
 
