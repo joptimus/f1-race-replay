@@ -45,8 +45,8 @@ export const Leaderboard: React.FC = () => {
   const currentLap = currentFrame?.lap || 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}>
+      <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)', flexShrink: 0 }}>
         <div className="f1-monospace" style={{ fontSize: '0.85rem', color: '#e10600', fontWeight: 900, marginBottom: '4px', position: 'relative', display: 'inline-block' }}>
           LAP: <span style={{ fontSize: '1rem' }}>{currentLap}/{totalLaps}</span>
           <AnimatePresence>
@@ -73,7 +73,7 @@ export const Leaderboard: React.FC = () => {
           TIME: {currentFrame?.t ? (currentFrame.t / 60).toFixed(2) : '0.00'}m | FRAME: {currentFrame?.t !== undefined ? Math.round(currentFrame.t * 25) : 0}
         </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)', flexShrink: 0 }}>
         <h3 style={{ fontWeight: 900, textTransform: 'uppercase', color: '#e10600', fontSize: '0.75rem', margin: 0 }}>STANDINGS</h3>
         <div style={{ display: 'flex', gap: '16px', marginRight: '8px', alignItems: 'center' }}>
           <span className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af', width: '40px', textAlign: 'right' }}>GAP</span>
@@ -81,7 +81,7 @@ export const Leaderboard: React.FC = () => {
           <span className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af', width: '24px', textAlign: 'center' }}>TYRE</span>
         </div>
       </div>
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <AnimatePresence mode="popLayout">
           {drivers.map(({ code, data, position, color, isOut }, index) => {
             const isSelected = selectedDriver?.code === code;

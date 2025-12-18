@@ -107,9 +107,9 @@ export const FP1Dashboard: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--f1-black)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%', background: 'var(--f1-black)' }}>
       {/* Header */}
-      <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)' }}>
+      <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)', flexShrink: 0 }}>
         <div className="f1-monospace" style={{ fontSize: '0.85rem', color: '#e10600', fontWeight: 900, marginBottom: '4px' }}>
           FP1 - PRACTICE SESSION
         </div>
@@ -119,7 +119,7 @@ export const FP1Dashboard: React.FC = () => {
       </div>
 
       {/* Legend */}
-      <div style={{ marginBottom: '12px', display: 'flex', gap: '16px' }}>
+      <div style={{ marginBottom: '12px', display: 'flex', gap: '16px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <div style={{ width: '10px', height: '10px', backgroundColor: '#a855f7', borderRadius: '2px' }} />
           <span className="f1-monospace" style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Fastest</span>
@@ -127,7 +127,7 @@ export const FP1Dashboard: React.FC = () => {
       </div>
 
       {/* Drivers List */}
-      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', minHeight: 0 }}>
         <AnimatePresence mode="popLayout">
           {drivers.map((driver) => {
             const isSelected = selectedDriver?.code === driver.code;
