@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 import json
+import aiofiles
 
 try:
     import pyarrow.feather as feather
@@ -102,10 +103,10 @@ async def get_cached_telemetry(
 
 
 async def _save_cache_async(path: Path, data: Any) -> None:
-    """Save cache in background."""
+    """Save cache asynchronously without blocking event loop."""
     try:
-        with open(path, "w") as f:
-            json.dump(data, f)
+        async with aiofiles.open(str(path), "w") as f:
+            await f.write(json.dumps(data))
         print(f"[CACHE] Saved cache to {path}")
     except Exception as e:
         print(f"[WARN] Failed to save cache: {e}")

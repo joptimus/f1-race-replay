@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { useReplayStore, useSelectedDriver, useCurrentFrame, useSectorColors } from "./store/replayStore";
+import { useReplayStore, useSelectedDriver, useSectorColors } from "./store/replayStore";
 import { useReplayWebSocket } from "./hooks/useReplayWebSocket";
 import { TrackVisualization3D } from "./components/TrackVisualization3D";
 import { PlaybackControls } from "./components/PlaybackControls";
@@ -33,8 +33,21 @@ const DriverHero = ({ year }: { year?: number }) => {
   const selected = useSelectedDriver();
 
   if (!selected) return (
-    <div className="f1-driver-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p className="f1-monospace">SELECT A DRIVER</p>
+    <div className="f1-driver-card" style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      border: '1px solid #374151',
+      background: 'var(--f1-black)',
+      borderRadius: '8px',
+      textAlign: 'center',
+    }}>
+      <p className="f1-monospace" style={{
+        color: '#6b7280',
+        fontSize: '0.875rem',
+        fontWeight: 600,
+        letterSpacing: '0.05em',
+      }}>NO DRIVER SELECTED</p>
     </div>
   );
 
@@ -107,7 +120,6 @@ const DriverHero = ({ year }: { year?: number }) => {
 const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year: number, round: number, refresh?: boolean) => void; onRefreshData: () => void }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const { session, setTotalFrames } = useReplayStore();
-  const currentFrame = useCurrentFrame();
   const { isConnected } = useReplayWebSocket(session.sessionId);
   const { isEnabled: showSectorColors, toggle: toggleSectorColors } = useSectorColors();
 
@@ -118,7 +130,6 @@ const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year
     }
   }, [session.metadata?.total_frames, setTotalFrames]);
 
-  const weather = currentFrame?.weather;
   const year = session.metadata?.year;
   const round = session.metadata?.round;
   const raceName = year && round
@@ -170,13 +181,6 @@ const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year
           {location && (
             <div className="f1-monospace" style={{ fontSize: '0.8rem', color: 'var(--f1-silver)' }}>
               {location}
-            </div>
-          )}
-          {weather && (
-            <div className="f1-monospace" style={{ fontSize: '0.75rem', color: 'var(--f1-silver)', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <div style={{ whiteSpace: 'nowrap' }}>T {Math.round(weather.track_temp)}°</div>
-              <div style={{ whiteSpace: 'nowrap' }}>W {Math.round(weather.wind_speed)}</div>
-              {weather.rain_state !== 'Dry' && <div style={{ whiteSpace: 'nowrap' }}>{weather.rain_state}</div>}
             </div>
           )}
           <div className="f1-monospace" style={{ fontSize: '0.8rem', color: 'var(--f1-silver)' }}>

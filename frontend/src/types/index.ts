@@ -16,6 +16,10 @@ export interface DriverData {
   dist: number;
   rel_dist: number;
   race_progress: number;
+  lap_time?: number | null;
+  sector1?: number | null;
+  sector2?: number | null;
+  sector3?: number | null;
 }
 
 export interface FrameData {
@@ -50,6 +54,12 @@ export interface TrackGeometry {
   sector?: number[];
 }
 
+export interface TrackStatus {
+  status: string;
+  start_time: number;
+  end_time: number | null;
+}
+
 export interface SessionMetadata {
   year: number;
   round: number;
@@ -58,6 +68,7 @@ export interface SessionMetadata {
   total_laps: number;
   driver_colors: Record<string, [number, number, number]>;
   track_geometry?: TrackGeometry;
+  track_statuses?: TrackStatus[];
   error?: string;
 }
 

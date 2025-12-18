@@ -20,13 +20,15 @@ export const SessionModal: React.FC<SessionModalProps> = ({
   isOpen,
   onClose,
   onSessionSelect,
-  currentYear = 2025,
-  currentRound = 12,
+  currentYear,
+  currentRound,
   isLoading = false,
 }) => {
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [selectedRound, setSelectedRound] = useState(currentRound);
   const years = dataService.getAvailableYears();
+  const defaultYear = currentYear ?? years[0];
+  const [selectedYear, setSelectedYear] = useState(defaultYear);
+  const defaultRound = currentRound ?? dataService.getRoundsForYear(defaultYear)[0]?.round ?? 1;
+  const [selectedRound, setSelectedRound] = useState(defaultRound);
   const availableRounds = dataService.getRoundsForYear(selectedYear);
 
   const handleSelect = () => {

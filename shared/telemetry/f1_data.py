@@ -50,6 +50,10 @@ def _process_single_driver(args):
     throttle_all = []
     brake_all = []
     rpm_all = []
+    lap_times_all = []
+    sector1_all = []
+    sector2_all = []
+    sector3_all = []
 
     total_dist_so_far = 0.0
 
@@ -75,6 +79,12 @@ def _process_single_driver(args):
         brake_lap = lap_tel["Brake"].to_numpy().astype(float)
         rpm_lap = lap_tel["RPM"].to_numpy()
 
+        # Extract lap timing information
+        lap_time = lap.LapTime.total_seconds() if pd.notna(lap.LapTime) else None
+        sector1 = lap.Sector1Time.total_seconds() if pd.notna(lap.Sector1Time) else None
+        sector2 = lap.Sector2Time.total_seconds() if pd.notna(lap.Sector2Time) else None
+        sector3 = lap.Sector3Time.total_seconds() if pd.notna(lap.Sector3Time) else None
+
         # race distance = distance before this lap + distance within this lap
         race_d_lap = total_dist_so_far + d_lap
 
@@ -91,6 +101,12 @@ def _process_single_driver(args):
         throttle_all.append(throttle_lap)
         brake_all.append(brake_lap)
         rpm_all.append(rpm_lap)
+
+        # Add lap time and sector times (same value for all points in this lap)
+        lap_times_all.append(np.full_like(t_lap, lap_time, dtype=object))
+        sector1_all.append(np.full_like(t_lap, sector1, dtype=object))
+        sector2_all.append(np.full_like(t_lap, sector2, dtype=object))
+        sector3_all.append(np.full_like(t_lap, sector3, dtype=object))
 
     if not t_all:
         return None
@@ -113,7 +129,8 @@ def _process_single_driver(args):
                 t_lap, x_all[lap_idx], y_all[lap_idx], race_dist_all[lap_idx],
                 rel_dist_all[lap_idx], lap_numbers[lap_idx], tyre_compounds[lap_idx],
                 speed_all[lap_idx], gear_all[lap_idx], drs_all[lap_idx],
-                throttle_all[lap_idx], brake_all[lap_idx], rpm_all[lap_idx]
+                throttle_all[lap_idx], brake_all[lap_idx], rpm_all[lap_idx],
+                lap_times_all[lap_idx], sector1_all[lap_idx], sector2_all[lap_idx], sector3_all[lap_idx]
             )
             intervals.append((t_lap[0], arrays))  # Sort key = lap start time
 
@@ -136,6 +153,10 @@ def _process_single_driver(args):
         throttle_all = np.concatenate([interval[1][10] for interval in intervals])
         brake_all = np.concatenate([interval[1][11] for interval in intervals])
         rpm_all = np.concatenate([interval[1][12] for interval in intervals])
+        lap_times_all = np.concatenate([interval[1][13] for interval in intervals])
+        sector1_all = np.concatenate([interval[1][14] for interval in intervals])
+        sector2_all = np.concatenate([interval[1][15] for interval in intervals])
+        sector3_all = np.concatenate([interval[1][16] for interval in intervals])
 
     # INTEGRITY: Verify concatenated time is monotonic (allow duplicates at lap boundaries)
     assert np.all(t_all[:-1] <= t_all[1:]), \
@@ -159,6 +180,10 @@ def _process_single_driver(args):
             "throttle": throttle_all,
             "brake": brake_all,
             "rpm": rpm_all,
+            "lap_time": lap_times_all,
+            "sector1": sector1_all,
+            "sector2": sector2_all,
+            "sector3": sector3_all,
         },
         "t_min": t_all.min(),
         "t_max": t_all.max(),
@@ -237,26 +262,31 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     # Prepare arguments for parallel processing
     print(f"Processing {len(drivers)} drivers in parallel...")
     driver_args = [(driver_no, session, driver_codes[driver_no]) for driver_no in drivers]
-    
+
     num_processes = min(cpu_count(), len(drivers))
-    
+
+    # Auto-tune chunk size for optimal load distribution
+    # Aim for 4-8 chunks per worker for balanced load distribution
+    num_drivers = len(drivers)
+    chunksize = max(1, (num_drivers + num_processes * 4 - 1) // (num_processes * 4))
+
     with Pool(processes=num_processes) as pool:
-        results = pool.map(_process_single_driver, driver_args)
-    
-    # Process results
-    for result in results:
-        if result is None:
-            continue
-        
-        code = result["code"]
-        driver_data[code] = result["data"]
-        
-        t_min = result["t_min"]
-        t_max = result["t_max"]
-        max_lap_number = max(max_lap_number, result["max_lap"])
-        
-        global_t_min = t_min if global_t_min is None else min(global_t_min, t_min)
-        global_t_max = t_max if global_t_max is None else max(global_t_max, t_max)
+        results = pool.imap_unordered(_process_single_driver, driver_args, chunksize=chunksize)
+
+        # Process results while pool is still active
+        for result in results:
+            if result is None:
+                continue
+
+            code = result["code"]
+            driver_data[code] = result["data"]
+
+            t_min = result["t_min"]
+            t_max = result["t_max"]
+            max_lap_number = max(max_lap_number, result["max_lap"])
+
+            global_t_min = t_min if global_t_min is None else min(global_t_min, t_min)
+            global_t_max = t_max if global_t_max is None else max(global_t_max, t_max)
 
     # Ensure we have valid time bounds
     if global_t_min is None or global_t_max is None:
@@ -297,7 +327,13 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         ]]
         x_resampled, y_resampled, dist_resampled, rel_dist_resampled, lap_resampled, \
         tyre_resampled, speed_resampled, gear_resampled, drs_resampled, throttle_resampled, brake_resampled, rpm_resampled = resampled
- 
+
+        # Resample lap and sector times (forward-fill since they don't change smoothly)
+        lap_time_resampled = np.interp(timeline, t_sorted, data["lap_time"], left=np.nan, right=np.nan)
+        sector1_resampled = np.interp(timeline, t_sorted, data["sector1"], left=np.nan, right=np.nan)
+        sector2_resampled = np.interp(timeline, t_sorted, data["sector2"], left=np.nan, right=np.nan)
+        sector3_resampled = np.interp(timeline, t_sorted, data["sector3"], left=np.nan, right=np.nan)
+
         resampled_data[code] = {
             "t": timeline,
             "x": x_resampled,
@@ -311,7 +347,11 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             "drs": drs_resampled,
             "throttle": throttle_resampled,
             "brake": brake_resampled,
-            "rpm": rpm_resampled
+            "rpm": rpm_resampled,
+            "lap_time": lap_time_resampled,
+            "sector1": sector1_resampled,
+            "sector2": sector2_resampled,
+            "sector3": sector3_resampled,
         }
 
     # 4. Incorporate track status data into the timeline (for safety car, VSC, etc.)
@@ -433,6 +473,10 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 "throttle": float(d['throttle'][i]),
                 "brake": float(d['brake'][i]),
                 "rpm": int(d['rpm'][i]),
+                "lap_time": float(d["lap_time"][i]) if not np.isnan(d["lap_time"][i]) else None,
+                "sector1": float(d["sector1"][i]) if not np.isnan(d["sector1"][i]) else None,
+                "sector2": float(d["sector2"][i]) if not np.isnan(d["sector2"][i]) else None,
+                "sector3": float(d["sector3"][i]) if not np.isnan(d["sector3"][i]) else None,
             }
             distances[code] = frame_data_raw[code]["dist"]
 
@@ -475,7 +519,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             frame_data[code]["position"] = position
 
             # Check distance monotonicity per driver (warns if data is non-monotonic)
-            progress = frame_data[code]["dist"]
+            progress = frame_data[code]["race_progress"]
             if progress + 1e-3 < last_dist[code]:
                 print(
                     f"[WARN] non-monotonic dist for {code} at t={t:.2f}s: "
@@ -499,7 +543,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                     "humidity": float(wt["humidity"][i]) if wt.get("humidity") is not None else None,
                     "wind_speed": float(wt["wind_speed"][i]) if wt.get("wind_speed") is not None else None,
                     "wind_direction": float(wt["wind_direction"][i]) if wt.get("wind_direction") is not None else None,
-                    "rain_state": "RAINING" if rain_val and rain_val >= 0.5 else "DRY",
+                    "rain_state": "RAINING" if rain_val and rain_val > 0 else "DRY",
                 }
             except Exception as e:
                 print(f"Failed to attach weather data to frame {i}: {e}")
@@ -765,7 +809,7 @@ def get_driver_quali_telemetry(session, driver_code: str, quali_segment: str):
                     "humidity": float(wt["humidity"][i]) if wt.get("humidity") is not None else None,
                     "wind_speed": float(wt["wind_speed"][i]) if wt.get("wind_speed") is not None else None,
                     "wind_direction": float(wt["wind_direction"][i]) if wt.get("wind_direction") is not None else None,
-                    "rain_state": "RAINING" if rain_val and rain_val >= 0.5 else "DRY",
+                    "rain_state": "RAINING" if rain_val and rain_val > 0 else "DRY",
                 }
             except Exception as e:
                 print(f"Failed to attach weather data to frame {i}: {e}")
@@ -901,19 +945,26 @@ def get_quali_telemetry(session, session_type='Q', refresh=False):
     driver_args = [(session, driver_codes[driver_no]) for driver_no in session.drivers]
 
     print(f"Processing {len(session.drivers)} drivers in parallel...")
-    
-    num_processes = min(cpu_count(), len(session.drivers))
-    
-    with Pool(processes=num_processes) as pool:
-        results = pool.map(_process_quali_driver, driver_args)
-    for result in results:
-        driver_code = result["driver_code"]
-        telemetry_data[driver_code] = result["driver_telemetry_data"]
 
-        if result["max_speed"] > max_speed:
-            max_speed = result["max_speed"]
-        if result["min_speed"] < min_speed or min_speed == 0.0:
-            min_speed = result["min_speed"]
+    num_processes = min(cpu_count(), len(session.drivers))
+
+    # Auto-tune chunk size for optimal load distribution
+    # Aim for 4-8 chunks per worker for balanced load distribution
+    num_drivers = len(session.drivers)
+    chunksize = max(1, (num_drivers + num_processes * 4 - 1) // (num_processes * 4))
+
+    with Pool(processes=num_processes) as pool:
+        results = pool.imap_unordered(_process_quali_driver, driver_args, chunksize=chunksize)
+
+        # Process results while pool is still active
+        for result in results:
+            driver_code = result["driver_code"]
+            telemetry_data[driver_code] = result["driver_telemetry_data"]
+
+            if result["max_speed"] > max_speed:
+                max_speed = result["max_speed"]
+            if result["min_speed"] < min_speed or min_speed == 0.0:
+                min_speed = result["min_speed"]
 
     # Save to the compute_data directory
 

@@ -10,9 +10,18 @@ export const Leaderboard: React.FC = () => {
   const currentFrame = useCurrentFrame();
   const selectedDriver = useSelectedDriver();
   const { setSelectedDriver } = useReplayStore();
-  const { metadata } = useReplayStore((state) => state.session);
+  const session = useReplayStore((state) => state.session);
+  const metadata = session?.metadata;
 
-  if (!currentFrame || !metadata) return <div className="p-4 f1-monospace">LOADING...</div>;
+  const isSafetyCarActive = React.useMemo(() => {
+    if (!metadata?.track_statuses || !currentFrame) return false;
+    const currentTime = currentFrame.t;
+    return metadata.track_statuses.some(
+      (status) => status.status === "4" && status.start_time <= currentTime && (status.end_time === null || currentTime < status.end_time)
+    );
+  }, [metadata?.track_statuses, currentFrame]);
+
+  if (!currentFrame || !metadata || !currentFrame.drivers) return <div className="p-4 f1-monospace">LOADING...</div>;
 
   const drivers = Object.entries(currentFrame.drivers)
     .map(([code, data]) => ({
@@ -39,8 +48,27 @@ export const Leaderboard: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)' }}>
-        <div className="f1-monospace" style={{ fontSize: '0.85rem', color: '#e10600', fontWeight: 900, marginBottom: '4px' }}>
+        <div className="f1-monospace" style={{ fontSize: '0.85rem', color: '#e10600', fontWeight: 900, marginBottom: '4px', position: 'relative', display: 'inline-block' }}>
           LAP: <span style={{ fontSize: '1rem' }}>{currentLap}/{totalLaps}</span>
+          <AnimatePresence>
+            {isSafetyCarActive && (
+              <motion.img
+                src="/images/fia/safetycar.png"
+                alt="Safety Car"
+                initial={{ opacity: 0, scale: 0.8, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '-32px',
+                  height: '28px',
+                  width: 'auto',
+                }}
+              />
+            )}
+          </AnimatePresence>
         </div>
         <div className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af' }}>
           TIME: {currentFrame?.t ? (currentFrame.t / 60).toFixed(2) : '0.00'}m | FRAME: {currentFrame?.t !== undefined ? Math.round(currentFrame.t * 25) : 0}
@@ -63,9 +91,15 @@ export const Leaderboard: React.FC = () => {
               <motion.div
                 key={code}
                 layout
-                onClick={() => setSelectedDriver({ code, data, color })}
+                onClick={() => {
+                  if (isSelected) {
+                    setSelectedDriver(null);
+                  } else {
+                    setSelectedDriver({ code, data, color });
+                  }
+                }}
                 className={`f1-row ${isSelected ? 'selected' : ''}`}
-                style={{ borderLeft: `4px solid ${hexColor}` }}
+                style={{ borderLeft: `4px solid ${hexColor}`, cursor: 'pointer' }}
               >
                 <span className="f1-monospace" style={{ width: '25px', fontWeight: 900, fontSize: '0.75rem' }}>{position}</span>
                 <span style={{ fontWeight: 700, width: '40px', fontSize: '0.85rem' }}>{code}</span>
