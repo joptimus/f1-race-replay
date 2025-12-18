@@ -3,14 +3,14 @@
  */
 
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Settings, Upload, RefreshCw, Palette } from "lucide-react";
+import { X, Settings, RefreshCw, Palette, BarChart3 } from "lucide-react";
 import { dataService } from "../services/dataService";
 
 interface SidebarMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoadSession?: () => void;
   onRefreshData?: () => void;
   showSectorColors?: boolean;
   onToggleSectorColors?: () => void;
@@ -22,7 +22,6 @@ interface SidebarMenuProps {
 export const SidebarMenu: React.FC<SidebarMenuProps> = ({
   isOpen,
   onClose,
-  onLoadSession,
   onRefreshData,
   showSectorColors,
   onToggleSectorColors,
@@ -30,6 +29,7 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
   currentRound = 12,
   onSessionSelect,
 }) => {
+  const navigate = useNavigate();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedRound, setSelectedRound] = useState(currentRound);
   const years = dataService.getAvailableYears();
@@ -357,6 +357,43 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
                     <span>{showSectorColors ? "Sector Colors ON" : "Sector Colors OFF"}</span>
                   </button>
                 )}
+
+                {/* Telemetry Comparison */}
+                <button
+                  onClick={() => {
+                    navigate("/comparison");
+                    onClose();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    padding: "12px 16px",
+                    borderRadius: "6px",
+                    border: "1px solid #374151",
+                    background: "#111318",
+                    color: "#d1d5db",
+                    cursor: "pointer",
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    transition: "all 0.2s ease",
+                    width: "100%",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as any).style.background = "#1f1f27";
+                    (e.currentTarget as any).style.borderColor = "#4b5563";
+                    (e.currentTarget as any).style.color = "#f3f4f6";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as any).style.background = "#111318";
+                    (e.currentTarget as any).style.borderColor = "#374151";
+                    (e.currentTarget as any).style.color = "#d1d5db";
+                  }}
+                >
+                  <BarChart3 size={18} />
+                  <span>Telemetry Comparison</span>
+                </button>
 
                 {/* Settings (placeholder) */}
                 <button

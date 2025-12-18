@@ -24,7 +24,10 @@
       "Bash(timeout 300 python:*)",
       "Bash(tasklist:*)",
       "Bash(xargs:*)",
-      "Bash(timeout 8 node dev.js:*)"
+      "Bash(timeout 8 node dev.js:*)",
+      "Bash(cat:*)",
+      "Bash(timeout 600 python:*)",
+      "Bash(timeout 120 python:*)"
     ]
   }
 }

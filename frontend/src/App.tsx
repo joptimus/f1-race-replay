@@ -2,6 +2,7 @@
  * Main App component for F1 Race Replay
  */
 import { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useReplayStore, useSelectedDriver, useCurrentFrame, useSectorColors } from "./store/replayStore";
 import { useReplayWebSocket } from "./hooks/useReplayWebSocket";
 import { TrackVisualization3D } from "./components/TrackVisualization3D";
@@ -11,17 +12,10 @@ import { TelemetryChart } from "./components/TelemetryChart";
 import { SidebarMenu } from "./components/SidebarMenu";
 import { LoadingModal } from "./components/LoadingModal";
 import { LandingPage } from "./components/LandingPage";
+import { ComparisonPage } from "./components/ComparisonPage";
 import { motion } from "framer-motion";
 import { dataService } from "./services/dataService";
 
-const DRIVER_NUMBERS: Record<string, string> = {
-  "HAM": "44", "VER": "1", "NOR": "4", "PIA": "81", "LEC": "16",
-  "SAI": "55", "RUS": "63", "ALO": "14", "STR": "18", "GAS": "10",
-  "OCO": "31", "ALB": "23", "TSU": "22", "RIC": "3", "BOT": "77",
-  "ZHO": "24", "HUL": "27", "MAG": "20", "SAR": "55", "PER": "30",
-  "ANT": "12", "LAW": "30", "COL": "5", "BEA": "87", "BOR": "5", "HAD": "6",
-  "DOO": "7", "OCA": "81"
-};
 
 const getImageExtension = (year: number, imageType: 'driver' | 'number' = 'driver'): string => {
   if (imageType === 'number') {
@@ -49,9 +43,10 @@ const DriverHero = ({ year }: { year?: number }) => {
 
   // Calculate accessible color (darker version)
   const accessibleColor = `rgb(${Math.max(0, color[0] - 80)}, ${Math.max(0, color[1] - 80)}, ${Math.max(0, color[2] - 80)})`;
-  const driverNum = DRIVER_NUMBERS[code] || "0";
-  const fullName = year ? dataService.getDriverFullName(year, code) : code;
   const displayYear = year || 2025;
+  const driver = year ? dataService.getDriverByCode(year, code) : null;
+  const driverNum = driver?.CarNumber || "0";
+  const fullName = year ? dataService.getDriverFullName(year, code) : code;
   const driverImgExt = getImageExtension(displayYear, 'driver');
   const numberImgExt = getImageExtension(displayYear, 'number');
 
@@ -109,12 +104,9 @@ const DriverHero = ({ year }: { year?: number }) => {
   );
 };
 
-function App() {
+const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year: number, round: number, refresh?: boolean) => void; onRefreshData: () => void }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [loadingSessionYear, setLoadingSessionYear] = useState(0);
-  const [loadingSessionRound, setLoadingSessionRound] = useState(0);
-  const [sessionSelected, setSessionSelected] = useState(false);
-  const { session, setSession, setSessionLoading, pause, setTotalFrames } = useReplayStore();
+  const { session, setTotalFrames } = useReplayStore();
   const currentFrame = useCurrentFrame();
   const { isConnected } = useReplayWebSocket(session.sessionId);
   const { isEnabled: showSectorColors, toggle: toggleSectorColors } = useSectorColors();
@@ -125,74 +117,6 @@ function App() {
       setTotalFrames(session.metadata.total_frames);
     }
   }, [session.metadata?.total_frames, setTotalFrames]);
-
-  // Poll for session status until data is loaded
-  const pollSessionStatus = async (sessionId: string) => {
-    const maxAttempts = 120; // 2 minutes max
-    let attempts = 0;
-
-    const poll = async () => {
-      try {
-        const response = await fetch(`/api/sessions/${sessionId}`);
-        const data = await response.json();
-
-        setSession(data.session_id, data.metadata);
-
-        if (!data.loading) {
-          setSessionLoading(false);
-          return;
-        }
-
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 1000); // Poll every second
-        } else {
-          setSessionLoading(false);
-        }
-      } catch (err) {
-        console.error("Failed to poll session status:", err);
-        setSessionLoading(false);
-      }
-    };
-
-    poll();
-  };
-
-  const handleSessionSelect = async (year: number, round: number, refresh: boolean = false) => {
-    try {
-      if (session.sessionId) {
-        pause();
-      }
-      setLoadingSessionYear(year);
-      setLoadingSessionRound(round);
-      setSessionLoading(true);
-      setSessionSelected(true);
-
-      const response = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ year, round_num: round, session_type: "R", refresh })
-      });
-      const data = await response.json();
-      setSession(data.session_id, data.metadata);
-      // Keep loading state true while we poll for completion
-      setSessionLoading(true);
-      pollSessionStatus(data.session_id);
-    } catch (err) {
-      console.error("Failed to load session:", err);
-      setSessionLoading(false);
-    }
-  };
-
-  const handleRefreshData = async () => {
-    if (session.metadata?.year && session.metadata?.round) {
-      handleSessionSelect(session.metadata.year, session.metadata.round, true);
-    }
-  };
-
-  if (!sessionSelected) {
-    return <LandingPage onSessionSelect={handleSessionSelect} isLoading={session.isLoading} />;
-  }
 
   const weather = currentFrame?.weather;
   const year = session.metadata?.year;
@@ -286,19 +210,102 @@ function App() {
         onClose={() => setMenuOpen(false)}
         currentYear={year}
         currentRound={round}
-        onSessionSelect={handleSessionSelect}
-        onRefreshData={handleRefreshData}
+        onSessionSelect={onSessionSelect}
+        onRefreshData={onRefreshData}
         showSectorColors={showSectorColors}
         onToggleSectorColors={toggleSectorColors}
       />
 
       <LoadingModal
         isOpen={session.isLoading}
-        year={loadingSessionYear || year}
-        round={loadingSessionRound || round}
+        year={year}
+        round={round}
         isFullyLoaded={!!session.metadata?.total_frames && !session.isLoading}
       />
     </div>
+  );
+};
+
+function AppRoutes() {
+  const navigate = useNavigate();
+  const { session, setSession, setSessionLoading, pause } = useReplayStore();
+
+  const pollSessionStatus = async (sessionId: string) => {
+    const maxAttempts = 120;
+    let attempts = 0;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}`);
+        const data = await response.json();
+
+        setSession(data.session_id, data.metadata);
+
+        if (!data.loading) {
+          setSessionLoading(false);
+          navigate("/replay");
+          return;
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 1000);
+        } else {
+          setSessionLoading(false);
+          navigate("/replay");
+        }
+      } catch (err) {
+        console.error("Failed to poll session status:", err);
+        setSessionLoading(false);
+      }
+    };
+
+    poll();
+  };
+
+  const handleSessionSelect = async (year: number, round: number, refresh: boolean = false) => {
+    try {
+      if (session.sessionId) {
+        pause();
+      }
+      setSessionLoading(true);
+
+      const response = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ year, round_num: round, session_type: "R", refresh })
+      });
+      const data = await response.json();
+      setSession(data.session_id, data.metadata);
+      setSessionLoading(true);
+      pollSessionStatus(data.session_id);
+    } catch (err) {
+      console.error("Failed to load session:", err);
+      setSessionLoading(false);
+    }
+  };
+
+  const handleRefreshData = async () => {
+    if (session.metadata?.year && session.metadata?.round) {
+      handleSessionSelect(session.metadata.year, session.metadata.round, true);
+    }
+  };
+
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage onSessionSelect={handleSessionSelect} isLoading={session.isLoading} />} />
+      <Route path="/replay" element={<ReplayView onSessionSelect={handleSessionSelect} onRefreshData={handleRefreshData} />} />
+      <Route path="/comparison" element={<ComparisonPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
   );
 }
 
