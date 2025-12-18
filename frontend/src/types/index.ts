@@ -106,3 +106,37 @@ export enum DRS_STATUS {
   ACTIVE_2 = 12,
   ACTIVE_3 = 14,
 }
+
+// Telemetry comparison types
+export interface LapTelemetryPoint {
+  distance: number;
+  speed: number;
+  throttle: number;
+  brake: number;
+  rpm: number;
+  gear: number;
+  x: number;
+  y: number;
+}
+
+export interface DriverLapTelemetry {
+  driver_code: string;
+  lap_number: number;
+  lap_time: number | null;
+  telemetry: LapTelemetryPoint[];
+}
+
+export interface SectorTime {
+  driver_code: string;
+  lap_number: number;
+  sector_1: number | null;
+  sector_2: number | null;
+  sector_3: number | null;
+  lap_time: number | null;
+}
+
+export interface ComparisonDriver {
+  code: string;
+  color: [number, number, number];
+  lapNumber: number;
+}

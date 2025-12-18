@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.telemetry.f1_data import enable_cache
-from backend.app.api import rounds, sessions
+from backend.app.api import rounds, sessions, telemetry
 from backend.app.websocket import handle_replay_websocket
 
 enable_cache()
@@ -39,6 +39,7 @@ app.add_middleware(
 
 app.include_router(rounds.router)
 app.include_router(sessions.router)
+app.include_router(telemetry.router)
 
 
 @app.get("/api/health")

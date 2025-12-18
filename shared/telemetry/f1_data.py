@@ -49,6 +49,7 @@ def _process_single_driver(args):
     drs_all = []
     throttle_all = []
     brake_all = []
+    rpm_all = []
 
     total_dist_so_far = 0.0
 
@@ -72,6 +73,7 @@ def _process_single_driver(args):
         drs_lap = lap_tel["DRS"].to_numpy()
         throttle_lap = lap_tel["Throttle"].to_numpy()
         brake_lap = lap_tel["Brake"].to_numpy().astype(float)
+        rpm_lap = lap_tel["RPM"].to_numpy()
 
         # race distance = distance before this lap + distance within this lap
         race_d_lap = total_dist_so_far + d_lap
@@ -88,24 +90,25 @@ def _process_single_driver(args):
         drs_all.append(drs_lap)
         throttle_all.append(throttle_lap)
         brake_all.append(brake_lap)
+        rpm_all.append(rpm_lap)
 
     if not t_all:
         return None
 
     # Concatenate all arrays at once for better performance
-    all_arrays = [t_all, x_all, y_all, race_dist_all, rel_dist_all, 
-                  lap_numbers, tyre_compounds, speed_all, gear_all, drs_all]
-    
+    all_arrays = [t_all, x_all, y_all, race_dist_all, rel_dist_all,
+                  lap_numbers, tyre_compounds, speed_all, gear_all, drs_all, rpm_all]
+
     t_all, x_all, y_all, race_dist_all, rel_dist_all, lap_numbers, \
-    tyre_compounds, speed_all, gear_all, drs_all = [np.concatenate(arr) for arr in all_arrays]
+    tyre_compounds, speed_all, gear_all, drs_all, rpm_all = [np.concatenate(arr) for arr in all_arrays]
 
     # Sort all arrays by time in one operation
     order = np.argsort(t_all)
-    all_data = [t_all, x_all, y_all, race_dist_all, rel_dist_all, 
-                lap_numbers, tyre_compounds, speed_all, gear_all, drs_all]
-    
+    all_data = [t_all, x_all, y_all, race_dist_all, rel_dist_all,
+                lap_numbers, tyre_compounds, speed_all, gear_all, drs_all, rpm_all]
+
     t_all, x_all, y_all, race_dist_all, rel_dist_all, lap_numbers, \
-    tyre_compounds, speed_all, gear_all, drs_all = [arr[order] for arr in all_data]
+    tyre_compounds, speed_all, gear_all, drs_all, rpm_all = [arr[order] for arr in all_data]
 
     throttle_all = np.concatenate(throttle_all)[order]
     brake_all = np.concatenate(brake_all)[order]
@@ -119,7 +122,7 @@ def _process_single_driver(args):
             "x": x_all,
             "y": y_all,
             "dist": race_dist_all,
-            "rel_dist": rel_dist_all,                   
+            "rel_dist": rel_dist_all,
             "lap": lap_numbers,
             "tyre": tyre_compounds,
             "speed": speed_all,
@@ -127,6 +130,7 @@ def _process_single_driver(args):
             "drs": drs_all,
             "throttle": throttle_all,
             "brake": brake_all,
+            "rpm": rpm_all,
         },
         "t_min": t_all.min(),
         "t_max": t_all.max(),
@@ -256,11 +260,12 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             data["drs"][order],
             data["throttle"][order],
             data["brake"][order],
+            data["rpm"][order],
         ]
         
         resampled = [np.interp(timeline, t_sorted, arr) for arr in arrays_to_resample]
         x_resampled, y_resampled, dist_resampled, rel_dist_resampled, lap_resampled, \
-        tyre_resampled, speed_resampled, gear_resampled, drs_resampled, throttle_resampled, brake_resampled = resampled
+        tyre_resampled, speed_resampled, gear_resampled, drs_resampled, throttle_resampled, brake_resampled, rpm_resampled = resampled
  
         resampled_data[code] = {
             "t": timeline,
@@ -274,7 +279,8 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             "gear": gear_resampled,
             "drs": drs_resampled,
             "throttle": throttle_resampled,
-            "brake": brake_resampled
+            "brake": brake_resampled,
+            "rpm": rpm_resampled
         }
 
     # 4. Incorporate track status data into the timeline (for safety car, VSC, etc.)
@@ -380,6 +386,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 "drs": int(d['drs'][i]),
                 "throttle": float(d['throttle'][i]),
                 "brake": float(d['brake'][i]),
+                "rpm": int(d['rpm'][i]),
             })
 
         # If for some reason we have no drivers at this instant
@@ -459,6 +466,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 "drs": car['drs'],
                 "throttle": car['throttle'],
                 "brake": car['brake'],
+                "rpm": car['rpm'],
             }
 
         weather_snapshot = {}
@@ -907,6 +915,96 @@ def get_quali_telemetry(session, session_type='Q', refresh=False):
         "max_speed": max_speed,
         "min_speed": min_speed,
     }
+
+
+def get_lap_telemetry(session, driver_codes: list, lap_numbers: list):
+    """Get detailed telemetry for specific drivers and lap numbers for comparison.
+
+    Args:
+        session: Loaded FastF1 session object
+        driver_codes: List of driver codes (e.g., ['VER', 'HAM'])
+        lap_numbers: List of lap numbers to retrieve (e.g., [10, 10])
+
+    Returns:
+        List of dicts with driver_code, lap_number, lap_time, and telemetry points
+    """
+    result = []
+
+    for driver_code in driver_codes:
+        for lap_num in lap_numbers:
+            try:
+                driver_laps = session.laps.pick_drivers(driver_code)
+                lap = driver_laps[driver_laps['LapNumber'] == lap_num].iloc[0]
+                telemetry = lap.get_telemetry()
+
+                if telemetry.empty:
+                    continue
+
+                points = []
+                for _, row in telemetry.iterrows():
+                    points.append({
+                        "distance": float(row["Distance"]),
+                        "speed": float(row["Speed"]),
+                        "throttle": float(row["Throttle"]),
+                        "brake": float(row["Brake"]),
+                        "rpm": int(row["RPM"]) if pd.notna(row["RPM"]) else 0,
+                        "gear": int(row["nGear"]),
+                        "x": float(row["X"]),
+                        "y": float(row["Y"]),
+                    })
+
+                lap_time = float(lap["LapTime"].total_seconds()) if pd.notna(lap["LapTime"]) else None
+
+                result.append({
+                    "driver_code": driver_code,
+                    "lap_number": int(lap_num),
+                    "lap_time": lap_time,
+                    "telemetry": points,
+                })
+            except (IndexError, KeyError) as e:
+                print(f"Warning: Could not get telemetry for {driver_code} lap {lap_num}: {e}")
+                continue
+
+    return result
+
+
+def get_sector_times(session, driver_codes: list, lap_numbers: list):
+    """Get sector times for specific drivers and lap numbers.
+
+    Args:
+        session: Loaded FastF1 session object
+        driver_codes: List of driver codes (e.g., ['VER', 'HAM'])
+        lap_numbers: List of lap numbers to retrieve (e.g., [10, 10])
+
+    Returns:
+        List of dicts with driver_code, lap_number, sector times, and lap time
+    """
+    result = []
+
+    for driver_code in driver_codes:
+        for lap_num in lap_numbers:
+            try:
+                driver_laps = session.laps.pick_drivers(driver_code)
+                lap = driver_laps[driver_laps['LapNumber'] == lap_num].iloc[0]
+
+                sector_1 = float(lap["Sector1Time"].total_seconds()) if pd.notna(lap["Sector1Time"]) else None
+                sector_2 = float(lap["Sector2Time"].total_seconds()) if pd.notna(lap["Sector2Time"]) else None
+                sector_3 = float(lap["Sector3Time"].total_seconds()) if pd.notna(lap["Sector3Time"]) else None
+                lap_time = float(lap["LapTime"].total_seconds()) if pd.notna(lap["LapTime"]) else None
+
+                result.append({
+                    "driver_code": driver_code,
+                    "lap_number": int(lap_num),
+                    "sector_1": sector_1,
+                    "sector_2": sector_2,
+                    "sector_3": sector_3,
+                    "lap_time": lap_time,
+                })
+            except (IndexError, KeyError) as e:
+                print(f"Warning: Could not get sector times for {driver_code} lap {lap_num}: {e}")
+                continue
+
+    return result
 
 
 def list_rounds(year):
