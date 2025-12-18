@@ -14,6 +14,8 @@ export interface DriverData {
   brake: number;
   drs: number;
   dist: number;
+  rel_dist: number;
+  race_progress: number;
 }
 
 export interface FrameData {

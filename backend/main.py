@@ -1,6 +1,7 @@
 """
 FastAPI backend for F1 Race Replay
 Handles data loading, caching, and real-time frame streaming via WebSocket
+Force reload: v2
 """
 
 from fastapi import FastAPI, WebSocket, HTTPException, BackgroundTasks, Body
@@ -37,15 +38,17 @@ class SessionRequest(BaseModel):
     year: int = 2025
     round_num: int = 1
     session_type: str = "R"
+    refresh: bool = False
 
 
 class F1ReplaySession:
     """Manages a single F1 replay session"""
 
-    def __init__(self, year: int, round_num: int, session_type: str):
+    def __init__(self, year: int, round_num: int, session_type: str, refresh: bool = False):
         self.year = year
         self.round_num = round_num
         self.session_type = session_type
+        self.refresh = refresh
         self.frames = None
         self.driver_colors = {}
         self.total_laps = 0
@@ -60,11 +63,11 @@ class F1ReplaySession:
             session = load_session(self.year, self.round_num, self.session_type)
 
             if self.session_type in ["Q", "SQ"]:
-                data = get_quali_telemetry(session, session_type=self.session_type)
+                data = get_quali_telemetry(session, session_type=self.session_type, refresh=self.refresh)
                 self.frames = data.get("frames", [])
                 self.driver_colors = data.get("driver_colors", {})
             else:
-                data = get_race_telemetry(session, session_type=self.session_type)
+                data = get_race_telemetry(session, session_type=self.session_type, refresh=self.refresh)
                 self.frames = data.get("frames", [])
                 self.driver_colors = data.get("driver_colors", {})
                 self.track_statuses = data.get("track_statuses", [])
@@ -125,6 +128,9 @@ class F1ReplaySession:
                 "throttle": float(driver_data.get("throttle", 0)),
                 "brake": float(driver_data.get("brake", 0)),
                 "drs": int(driver_data.get("drs", 0)),
+                "dist": float(driver_data.get("dist", 0)),
+                "rel_dist": float(driver_data.get("rel_dist", 0)),
+                "race_progress": float(driver_data.get("race_progress", 0)),
             }
 
         if "weather" in frame:
@@ -215,18 +221,19 @@ async def create_session(background_tasks: BackgroundTasks, request: SessionRequ
     year = request.year
     round_num = request.round_num
     session_type = request.session_type
+    refresh = request.refresh
     session_id = f"{year}_{round_num}_{session_type}"
 
-    # Check if already loaded
-    if session_id in active_sessions:
+    # Check if already loaded (skip if refresh is requested)
+    if session_id in active_sessions and not refresh:
         session = active_sessions[session_id]
         if session.is_loaded:
             if session.load_error:
                 raise HTTPException(status_code=400, detail=session.load_error)
             return {"session_id": session_id, "metadata": session.get_metadata()}
 
-    # Create new session
-    session = F1ReplaySession(year, round_num, session_type)
+    # Create new session (with refresh flag)
+    session = F1ReplaySession(year, round_num, session_type, refresh=refresh)
     active_sessions[session_id] = session
 
     # Load data asynchronously
