@@ -407,12 +407,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             rel = max(0.0, min(1.0, rel))
             r["race_progress"] = (lap - 1) * circuit_length + rel * circuit_length
 
-        # Debug: Log BEFORE sort
         time_seconds = t
-        debug_start_time, debug_end_time = 10.0, 35.0
-        if debug_start_time <= time_seconds <= debug_end_time:
-            before = [(r["code"], int(r["lap"]), round(r["rel_dist"], 3), round(r["race_progress"], 1)) for r in snapshot[:10]]
-            print(f"[BEFORE_SORT] t={time_seconds:.2f}s frame {i}: {before}", flush=True)
 
         if is_race_start and grid_positions:
             # Use grid position primarily, race_progress as tiebreaker
@@ -425,18 +420,13 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             # Higher race_progress = more distance covered = ahead
             snapshot.sort(key=lambda r: -r["race_progress"])
 
-        # Debug: Log AFTER sort
-        if debug_start_time <= time_seconds <= debug_end_time:
-            after = [(r["code"], int(r["lap"]), round(r["rel_dist"], 3), round(r["race_progress"], 1)) for r in snapshot[:10]]
-            print(f"[AFTER_SORT] t={time_seconds:.2f}s frame {i}: {after}", flush=True)
-
-        # Step 3: Check distance monotonicity per driver
+        # Check distance monotonicity per driver (warns if data is non-monotonic)
         for r in snapshot:
             code = r["code"]
             progress = float(r.get("dist", 0.0))
             if progress + 1e-3 < last_dist[code]:
                 print(
-                    f"[WARN_MONOTONICITY] non-monotonic dist for {code} at t={time_seconds:.2f}s: "
+                    f"[WARN] non-monotonic dist for {code} at t={time_seconds:.2f}s: "
                     f"{progress:.3f} < {last_dist[code]:.3f}",
                     flush=True,
                 )
