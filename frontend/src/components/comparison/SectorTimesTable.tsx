@@ -11,6 +11,7 @@ interface SectorStatus {
 export const SectorTimesTable: React.FC = () => {
   const { sectorTimes, selectedDrivers } = useComparisonStore();
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
+  const [expandedTimes, setExpandedTimes] = useState<Set<string>>(new Set());
 
   if (sectorTimes.length === 0) {
     return (
@@ -20,7 +21,7 @@ export const SectorTimesTable: React.FC = () => {
     );
   }
 
-  const formatTimeDisplay = (seconds: number | null): string => {
+  const formatTimeDisplay = (seconds: number | null, expanded: boolean = false): string => {
     if (seconds === null) return "-";
 
     if (seconds < 60) {
@@ -28,8 +29,20 @@ export const SectorTimesTable: React.FC = () => {
     } else {
       const minutes = Math.floor(seconds / 60);
       const secs = seconds % 60;
-      return `${minutes}:${secs.toFixed(3).padStart(7, '0')}`;
+      const decimalPlaces = expanded ? 3 : 1;
+      return `${minutes}:${secs.toFixed(decimalPlaces).padStart(expanded ? 7 : 5, '0')}`;
     }
+  };
+
+  const toggleTimeExpanded = (timeKey: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newExpanded = new Set(expandedTimes);
+    if (newExpanded.has(timeKey)) {
+      newExpanded.delete(timeKey);
+    } else {
+      newExpanded.add(timeKey);
+    }
+    setExpandedTimes(newExpanded);
   };
 
   const formatTime = (seconds: number | null) => {
@@ -62,8 +75,9 @@ export const SectorTimesTable: React.FC = () => {
     };
   };
 
-  const SectorCell = ({ value, fastest, driverBest }: { value: number | null; fastest: number; driverBest: number }) => {
+  const SectorCell = ({ value, fastest, driverBest, timeKey }: { value: number | null; fastest: number; driverBest: number; timeKey: string }) => {
     const status = getSectorStatus(value, fastest, driverBest);
+    const isExpanded = expandedTimes.has(timeKey);
 
     let barColor = '#6b7280'; // default gray
     let borderColor = '#374151';
@@ -82,6 +96,7 @@ export const SectorTimesTable: React.FC = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
         <div
+          onClick={(e) => toggleTimeExpanded(timeKey, e)}
           className="f1-monospace"
           style={{
             padding: '8px 12px',
@@ -92,9 +107,17 @@ export const SectorTimesTable: React.FC = () => {
             color: status.isFastest || status.isPersonalBest ? borderColor : 'inherit',
             minWidth: '70px',
             textAlign: 'right',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLDivElement).style.opacity = '0.8';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLDivElement).style.opacity = '1';
           }}
         >
-          {formatTime(value)}
+          {formatTimeDisplay(value, isExpanded)}
         </div>
         <div
           style={{
@@ -180,17 +203,18 @@ export const SectorTimesTable: React.FC = () => {
                     {sector.lap_number}
                   </td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>
-                    <SectorCell value={sector.sector_1} fastest={fastestS1} driverBest={driverBests.s1} />
+                    <SectorCell value={sector.sector_1} fastest={fastestS1} driverBest={driverBests.s1} timeKey={`${idx}-s1`} />
                   </td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>
-                    <SectorCell value={sector.sector_2} fastest={fastestS2} driverBest={driverBests.s2} />
+                    <SectorCell value={sector.sector_2} fastest={fastestS2} driverBest={driverBests.s2} timeKey={`${idx}-s2`} />
                   </td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>
-                    <SectorCell value={sector.sector_3} fastest={fastestS3} driverBest={driverBests.s3} />
+                    <SectorCell value={sector.sector_3} fastest={fastestS3} driverBest={driverBests.s3} timeKey={`${idx}-s3`} />
                   </td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                       <div
+                        onClick={(e) => toggleTimeExpanded(`${idx}-lap`, e)}
                         className="f1-monospace"
                         style={{
                           padding: '8px 12px',
@@ -201,9 +225,17 @@ export const SectorTimesTable: React.FC = () => {
                           color: sector.lap_time === fastestLap ? '#22c55e' : 'inherit',
                           minWidth: '70px',
                           textAlign: 'right',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLDivElement).style.opacity = '0.8';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLDivElement).style.opacity = '1';
                         }}
                       >
-                        {formatTime(sector.lap_time)}
+                        {formatTimeDisplay(sector.lap_time, expandedTimes.has(`${idx}-lap`))}
                       </div>
                       <div
                         style={{
@@ -303,6 +335,10 @@ export const SectorTimesTable: React.FC = () => {
                               {sector_data.label}
                             </div>
                             <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTimeExpanded(`detail-${idx}-${sector_data.label}`, e);
+                              }}
                               className="f1-monospace"
                               style={{
                                 padding: '8px',
@@ -315,9 +351,17 @@ export const SectorTimesTable: React.FC = () => {
                                 borderRadius: '4px',
                                 fontSize: '0.85rem',
                                 fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLDivElement).style.opacity = '0.8';
+                              }}
+                              onMouseLeave={(e) => {
+                                (e.currentTarget as HTMLDivElement).style.opacity = '1';
                               }}
                             >
-                              {formatTimeDisplay(sector_data.value)}
+                              {formatTimeDisplay(sector_data.value, expandedTimes.has(`detail-${idx}-${sector_data.label}`))}
                             </div>
                           </div>
                         );
@@ -330,6 +374,10 @@ export const SectorTimesTable: React.FC = () => {
                         LAP TIME
                       </div>
                       <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTimeExpanded(`detail-${idx}-lap`, e);
+                        }}
                         className="f1-monospace"
                         style={{
                           padding: '12px',
@@ -340,9 +388,17 @@ export const SectorTimesTable: React.FC = () => {
                           fontSize: '1rem',
                           fontWeight: 700,
                           color: sector.lap_time === fastestLap ? '#22c55e' : 'inherit',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLDivElement).style.opacity = '0.8';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLDivElement).style.opacity = '1';
                         }}
                       >
-                        {formatTimeDisplay(sector.lap_time)}
+                        {formatTimeDisplay(sector.lap_time, expandedTimes.has(`detail-${idx}-lap`))}
                       </div>
                     </div>
                   </div>
