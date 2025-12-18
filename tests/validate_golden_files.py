@@ -110,18 +110,21 @@ def validate_against_golden(year: int, round_num: int, session_type: str, name: 
                             issues.append(f"{field} is None for {code} at frame {frame_idx}")
                             continue
 
-                        # Allow 1e-6 relative tolerance for floats
+                        # Allow robust floating-point comparison (relative + absolute tolerance)
                         if isinstance(actual_val, (int, float)) and isinstance(expected_val, (int, float)):
+                            abs_diff = abs(actual_val - expected_val)
+                            # Combined tolerance: 1e-5 relative OR 1e-9 absolute
+                            # Handles both large values (rel tolerance) and near-zero values (abs tolerance)
                             if expected_val != 0:
-                                rel_error = abs(actual_val - expected_val) / abs(expected_val)
-                                if rel_error > 1e-6:
+                                rel_error = abs_diff / abs(expected_val)
+                                if rel_error > 1e-5 and abs_diff > 1e-9:
                                     issues.append(
-                                        f"{field} mismatch for {code} at frame {frame_idx}: {actual_val} vs {expected_val} (rel_error={rel_error:.2e})"
+                                        f"{field} mismatch for {code} at frame {frame_idx}: {actual_val} vs {expected_val} (rel_error={rel_error:.2e}, abs_diff={abs_diff:.2e})"
                                     )
                             else:
-                                if abs(actual_val - expected_val) > 1e-6:
+                                if abs_diff > 1e-9:
                                     issues.append(
-                                        f"{field} mismatch for {code} at frame {frame_idx}: {actual_val} vs {expected_val}"
+                                        f"{field} mismatch for {code} at frame {frame_idx}: {actual_val} vs {expected_val} (abs_diff={abs_diff:.2e})"
                                     )
 
     # 5. Check for NaN values

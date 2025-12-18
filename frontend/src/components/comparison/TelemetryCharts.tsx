@@ -175,29 +175,31 @@ const TelemetryLineChart: React.FC<ChartProps> = ({ title, dataKey, unit, yAxisD
           <ReferenceLine
             x={sector1End.toFixed(0)}
             stroke="#ef4444"
-            strokeDasharray="5 5"
-            opacity={0.2}
+            strokeDasharray="8 4"
+            strokeWidth={2}
+            opacity={0.35}
             label={{
               value: 'S1/S2',
               position: 'top',
               fill: '#ef4444',
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
-              opacity: 0.4,
+              offset: 8,
             }}
           />
           <ReferenceLine
             x={sector2End.toFixed(0)}
             stroke="#ef4444"
-            strokeDasharray="5 5"
-            opacity={0.2}
+            strokeDasharray="8 4"
+            strokeWidth={2}
+            opacity={0.35}
             label={{
               value: 'S2/S3',
               position: 'top',
               fill: '#ef4444',
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
-              opacity: 0.4,
+              offset: 8,
             }}
           />
 

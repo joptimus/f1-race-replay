@@ -74,29 +74,38 @@ class F1ReplaySession:
         if not self.frames or frame_index >= len(self.frames):
             return json.dumps({"error": "Invalid frame index"})
 
+        def safe_float(value, default=0.0):
+            try:
+                f = float(value)
+                if f != f or not (-1e308 < f < 1e308):
+                    return default
+                return f
+            except (ValueError, TypeError):
+                return default
+
         frame = self.frames[frame_index]
 
         payload = {
-            "t": frame.get("t", 0.0),
+            "t": safe_float(frame.get("t"), 0.0),
             "lap": frame.get("lap", 1),
             "drivers": {},
         }
 
         for driver_code, driver_data in frame.get("drivers", {}).items():
             payload["drivers"][driver_code] = {
-                "x": float(driver_data.get("x", 0)),
-                "y": float(driver_data.get("y", 0)),
-                "speed": float(driver_data.get("speed", 0)),
+                "x": safe_float(driver_data.get("x")),
+                "y": safe_float(driver_data.get("y")),
+                "speed": safe_float(driver_data.get("speed")),
                 "gear": int(driver_data.get("gear", 0)),
                 "lap": int(driver_data.get("lap", 0)),
                 "position": int(driver_data.get("position", 0)),
                 "tyre": int(driver_data.get("tyre", 0)),
-                "throttle": float(driver_data.get("throttle", 0)),
-                "brake": float(driver_data.get("brake", 0)),
+                "throttle": safe_float(driver_data.get("throttle")),
+                "brake": safe_float(driver_data.get("brake")),
                 "drs": int(driver_data.get("drs", 0)),
-                "dist": float(driver_data.get("dist", 0)),
-                "rel_dist": float(driver_data.get("rel_dist", 0)),
-                "race_progress": float(driver_data.get("race_progress", 0)),
+                "dist": safe_float(driver_data.get("dist")),
+                "rel_dist": safe_float(driver_data.get("rel_dist")),
+                "race_progress": safe_float(driver_data.get("race_progress")),
             }
 
         if "weather" in frame:

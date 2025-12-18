@@ -105,8 +105,8 @@ def _process_single_driver(args):
         t_lap = t_all[lap_idx]
         if len(t_lap) > 0:
             # INTEGRITY: Assert time is strictly monotonic within lap
-            assert np.all(t_lap[:-1] <= t_lap[1:]), \
-                f"Non-monotonic lap time for {driver_code} in lap {lap_idx}"
+            assert np.all(t_lap[:-1] < t_lap[1:]), \
+                f"Strictly non-monotonic lap time for {driver_code} in lap {lap_idx}"
 
             # Bundle all arrays for this lap
             arrays = (
@@ -138,8 +138,8 @@ def _process_single_driver(args):
         rpm_all = np.concatenate([interval[1][12] for interval in intervals])
 
     # INTEGRITY: Verify concatenated time is strictly increasing
-    assert np.all(t_all[:-1] <= t_all[1:]), \
-        f"Non-monotonic concatenated time for {driver_code}"
+    assert np.all(t_all[:-1] < t_all[1:]), \
+        f"Strictly non-monotonic concatenated time for {driver_code}"
 
     print(f"Completed telemetry for driver: {driver_code}")
     
@@ -274,8 +274,8 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         # OPTIMIZATION: Data should already be pre-sorted from _process_single_driver
         # Skip redundant np.argsort() call - this is Bottleneck #4 fix
         # INTEGRITY: Assert data is strictly monotonic
-        assert np.all(t[:-1] <= t[1:]), \
-            f"Driver {code} data not monotonic in time (pre-sort failed in _process_single_driver)"
+        assert np.all(t[:-1] < t[1:]), \
+            f"Driver {code} data not strictly increasing in time (pre-sort failed in _process_single_driver)"
 
         t_sorted = t  # No need to sort if pre-sorted
 
@@ -404,7 +404,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     race_progress_all = {}
     for code in driver_codes:
         d = driver_arrays[code]
-        lap = np.maximum(d["lap"], 1)  # Ensure lap >= 1
+        lap = np.maximum(np.round(d["lap"]), 1)  # Round to nearest lap, ensure >= 1
         rel = np.clip(d["rel_dist"], 0.0, 1.0)  # Clamp rel_dist to [0,1]
         race_progress_all[code] = (lap - 1) * circuit_length + rel * circuit_length
 
@@ -426,7 +426,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 "lap": int(round(d["lap"][i])),
                 "rel_dist": float(d["rel_dist"][i]),
                 "race_progress": float(race_prog),
-                "tyre": float(d["tyre"][i]),
+                "tyre": int(d["tyre"][i]),
                 "speed": float(d['speed'][i]),
                 "gear": int(d['gear'][i]),
                 "drs": int(d['drs'][i]),
