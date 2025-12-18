@@ -1,0 +1,20 @@
+{
+  "name": "f1-race-replay",
+  "version": "1.0.0",
+  "description": "F1 Race Replay - Interactive Formula 1 race visualization and analysis",
+  "main": "start.js",
+  "scripts": {
+    "start": "node start.js",
+    "dev": "node scripts/dev.js",
+    "dev:no-open": "node scripts/dev.js --no-open"
+  },
+  "keywords": [
+    "formula1",
+    "f1",
+    "racing",
+    "telemetry",
+    "visualization"
+  ],
+  "author": "",
+  "license": "MIT"
+}
