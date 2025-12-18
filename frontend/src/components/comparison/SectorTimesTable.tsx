@@ -28,7 +28,7 @@ export const SectorTimesTable: React.FC = () => {
     } else {
       const minutes = Math.floor(seconds / 60);
       const secs = seconds % 60;
-      return `${minutes}:${secs.toFixed(2).padStart(5, '0')}`;
+      return `${minutes}:${secs.toFixed(3).padStart(7, '0')}`;
     }
   };
 
