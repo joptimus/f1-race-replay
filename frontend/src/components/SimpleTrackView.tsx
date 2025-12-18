@@ -10,7 +10,7 @@ export const SimpleTrackView: React.FC = () => {
   const currentFrame = useCurrentFrame();
   const selectedDriver = useSelectedDriver();
 
-  if (!currentFrame) {
+  if (!currentFrame || !currentFrame.drivers) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
         <p style={{ color: '#9ca3af' }}>Loading race data...</p>

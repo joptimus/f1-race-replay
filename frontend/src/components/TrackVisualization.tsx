@@ -89,7 +89,7 @@ const ReplayScene = ({
       )}
 
       {/* Driver positions */}
-      {currentFrame &&
+      {currentFrame && currentFrame.drivers &&
         Object.entries(currentFrame.drivers).map(([code, driver]) => {
           const color = driverColors[code] || [255, 255, 255];
           const hexColor = `#${color.map((c) => c.toString(16).padStart(2, "0")).join("")}`;

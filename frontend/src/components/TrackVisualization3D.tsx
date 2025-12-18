@@ -330,7 +330,7 @@ export const TrackVisualization3D: React.FC = () => {
 
   // Update driver positions on each frame
   useEffect(() => {
-    if (!sceneRef.current || !currentFrame || !containerRef.current) return;
+    if (!sceneRef.current || !currentFrame || !currentFrame.drivers || !containerRef.current) return;
 
     const scene = sceneRef.current;
     const camera = cameraRef.current;
