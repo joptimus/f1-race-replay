@@ -3,6 +3,7 @@ import sys
 import fastf1
 import fastf1.plotting
 from multiprocessing import Pool, cpu_count
+from collections import defaultdict
 import numpy as np
 import json
 import pickle
@@ -345,8 +346,21 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     driver_arrays = {code: resampled_data[code] for code in driver_codes}
 
     race_finished = False  # Flag to track once race end is detected
+    last_dist = defaultdict(lambda: -1.0)  # Track monotonicity of dist per driver
 
-    print(f"DEBUG: Starting frame processing. Total frames: {num_frames}, Timeline range: {timeline[0]:.1f}s to {timeline[-1]:.1f}s", flush=True)
+    # Calculate circuit length from reference lap (fastest lap)
+    circuit_length = 0.0
+    try:
+        reference_lap = session.laps.pick_fastest().get_telemetry()
+        if not reference_lap.empty:
+            ref_distances = reference_lap["Distance"].to_numpy()
+            circuit_length = ref_distances[-1] - ref_distances[0] if len(ref_distances) > 1 else 0.0
+            print(f"DEBUG: Calculated circuit_length = {circuit_length:.1f}m from reference lap", flush=True)
+    except Exception as e:
+        print(f"WARNING: Could not calculate circuit_length: {e}", flush=True)
+        circuit_length = 5000.0  # Fallback estimate
+
+    print(f"DEBUG: Starting frame processing. Total frames: {num_frames}, Timeline range: {timeline[0]:.1f}s to {timeline[-1]:.1f}s, Circuit length: {circuit_length:.1f}m", flush=True)
 
     for i in range(num_frames):
         t = timeline[i]
@@ -384,22 +398,49 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         if max_rel_dist >= 0.99 and final_positions:
             race_finished = True
 
+        # Calculate race_progress (accumulated distance) for each driver
+        # race_progress = (lap - 1) * circuit_length + rel_dist * circuit_length
+        for r in snapshot:
+            lap = max(r.get("lap", 1), 1)
+            rel = float(r.get("rel_dist", 0.0))
+            # Clamp rel_dist to [0, 1] in case of data artifacts
+            rel = max(0.0, min(1.0, rel))
+            r["race_progress"] = (lap - 1) * circuit_length + rel * circuit_length
+
+        # Debug: Log BEFORE sort
+        time_seconds = t
+        debug_start_time, debug_end_time = 10.0, 35.0
+        if debug_start_time <= time_seconds <= debug_end_time:
+            before = [(r["code"], int(r["lap"]), round(r["rel_dist"], 3), round(r["race_progress"], 1)) for r in snapshot[:10]]
+            print(f"[BEFORE_SORT] t={time_seconds:.2f}s frame {i}: {before}", flush=True)
+
         if is_race_start and grid_positions:
-            # Use grid position primarily, relative distance as tiebreaker
-            snapshot.sort(key=lambda r: (grid_positions.get(r["code"], 999), -r["rel_dist"]))
+            # Use grid position primarily, race_progress as tiebreaker
+            snapshot.sort(key=lambda r: (grid_positions.get(r["code"], 999), -r["race_progress"]))
         elif race_finished and final_positions:
             # Once race is finished, always use official final race positions
             snapshot.sort(key=lambda r: final_positions.get(r["code"], 999))
         else:
-            # During the race, sort by lap first, then by position on track (relative distance)
-            # Higher lap = ahead, higher rel_dist on that lap = ahead
-            snapshot.sort(key=lambda r: (-r["lap"], -r["rel_dist"]))
+            # During the race, sort by accumulated race progress
+            # Higher race_progress = more distance covered = ahead
+            snapshot.sort(key=lambda r: -r["race_progress"])
 
-        # Debug: Log frames based on time (user reported problems around 0.2m-0.5m)
-        time_seconds = t
-        if 10 < time_seconds < 35:  # 10-35 seconds into race (covers reported frame times)
-            debug_data = [(r["code"], round(r["lap"], 2), round(r["dist"], 1)) for r in snapshot[:5]]
-            print(f"DEBUG t={time_seconds:.1f}s frame {i}: TOP 5: {debug_data}", flush=True)
+        # Debug: Log AFTER sort
+        if debug_start_time <= time_seconds <= debug_end_time:
+            after = [(r["code"], int(r["lap"]), round(r["rel_dist"], 3), round(r["race_progress"], 1)) for r in snapshot[:10]]
+            print(f"[AFTER_SORT] t={time_seconds:.2f}s frame {i}: {after}", flush=True)
+
+        # Step 3: Check distance monotonicity per driver
+        for r in snapshot:
+            code = r["code"]
+            progress = float(r.get("dist", 0.0))
+            if progress + 1e-3 < last_dist[code]:
+                print(
+                    f"[WARN_MONOTONICITY] non-monotonic dist for {code} at t={time_seconds:.2f}s: "
+                    f"{progress:.3f} < {last_dist[code]:.3f}",
+                    flush=True,
+                )
+            last_dist[code] = progress
 
         leader = snapshot[0]
         leader_lap = leader["lap"]
@@ -417,9 +458,10 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             frame_data[code] = {
                 "x": car["x"],
                 "y": car["y"],
-                "dist": car["dist"],    
+                "dist": car["dist"],
                 "lap": car["lap"],
                 "rel_dist": round(car["rel_dist"], 4),
+                "race_progress": round(car["race_progress"], 1),
                 "tyre": car["tyre"],
                 "position": position,
                 "speed": car['speed'],
