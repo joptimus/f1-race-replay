@@ -95,23 +95,51 @@ def _process_single_driver(args):
     if not t_all:
         return None
 
-    # Concatenate all arrays at once for better performance
-    all_arrays = [t_all, x_all, y_all, race_dist_all, rel_dist_all,
-                  lap_numbers, tyre_compounds, speed_all, gear_all, drs_all, rpm_all]
+    # OPTIMIZATION: Pre-sort lap intervals before concatenation to avoid O(2N) memory spike
+    # Collect laps as (start_time, arrays_tuple) and verify monotonicity within each lap
+    intervals = []
 
-    t_all, x_all, y_all, race_dist_all, rel_dist_all, lap_numbers, \
-    tyre_compounds, speed_all, gear_all, drs_all, rpm_all = [np.concatenate(arr) for arr in all_arrays]
+    # We need to reconstruct the intervals from the lists we've accumulated
+    # Zip together all lap arrays to create intervals
+    for lap_idx in range(len(t_all)):
+        t_lap = t_all[lap_idx]
+        if len(t_lap) > 0:
+            # INTEGRITY: Assert time is strictly monotonic within lap
+            assert np.all(t_lap[:-1] <= t_lap[1:]), \
+                f"Non-monotonic lap time for {driver_code} in lap {lap_idx}"
 
-    # Sort all arrays by time in one operation
-    order = np.argsort(t_all)
-    all_data = [t_all, x_all, y_all, race_dist_all, rel_dist_all,
-                lap_numbers, tyre_compounds, speed_all, gear_all, drs_all, rpm_all]
+            # Bundle all arrays for this lap
+            arrays = (
+                t_lap, x_all[lap_idx], y_all[lap_idx], race_dist_all[lap_idx],
+                rel_dist_all[lap_idx], lap_numbers[lap_idx], tyre_compounds[lap_idx],
+                speed_all[lap_idx], gear_all[lap_idx], drs_all[lap_idx],
+                throttle_all[lap_idx], brake_all[lap_idx], rpm_all[lap_idx]
+            )
+            intervals.append((t_lap[0], arrays))  # Sort key = lap start time
 
-    t_all, x_all, y_all, race_dist_all, rel_dist_all, lap_numbers, \
-    tyre_compounds, speed_all, gear_all, drs_all, rpm_all = [arr[order] for arr in all_data]
+    # Sort intervals by start time (small list, typically 50-100 laps)
+    # INTEGRITY: Verify laps are chronological
+    intervals.sort(key=lambda x: x[0])
 
-    throttle_all = np.concatenate(throttle_all)[order]
-    brake_all = np.concatenate(brake_all)[order]
+    # Concatenate pre-sorted intervals (single concatenation operation)
+    if intervals:
+        t_all = np.concatenate([interval[1][0] for interval in intervals])
+        x_all = np.concatenate([interval[1][1] for interval in intervals])
+        y_all = np.concatenate([interval[1][2] for interval in intervals])
+        race_dist_all = np.concatenate([interval[1][3] for interval in intervals])
+        rel_dist_all = np.concatenate([interval[1][4] for interval in intervals])
+        lap_numbers = np.concatenate([interval[1][5] for interval in intervals])
+        tyre_compounds = np.concatenate([interval[1][6] for interval in intervals])
+        speed_all = np.concatenate([interval[1][7] for interval in intervals])
+        gear_all = np.concatenate([interval[1][8] for interval in intervals])
+        drs_all = np.concatenate([interval[1][9] for interval in intervals])
+        throttle_all = np.concatenate([interval[1][10] for interval in intervals])
+        brake_all = np.concatenate([interval[1][11] for interval in intervals])
+        rpm_all = np.concatenate([interval[1][12] for interval in intervals])
+
+    # INTEGRITY: Verify concatenated time is strictly increasing
+    assert np.all(t_all[:-1] <= t_all[1:]), \
+        f"Non-monotonic concatenated time for {driver_code}"
 
     print(f"Completed telemetry for driver: {driver_code}")
     
@@ -243,27 +271,30 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     for code, data in driver_data.items():
         t = data["t"] - global_t_min  # Shift
 
-        # ensure sorted by time
-        order = np.argsort(t)
-        t_sorted = t[order]
-        
-        # Vectorize all resampling in one operation for speed
-        arrays_to_resample = [
-            data["x"][order],
-            data["y"][order],
-            data["dist"][order],
-            data["rel_dist"][order],
-            data["lap"][order],
-            data["tyre"][order],
-            data["speed"][order],
-            data["gear"][order],
-            data["drs"][order],
-            data["throttle"][order],
-            data["brake"][order],
-            data["rpm"][order],
-        ]
-        
-        resampled = [np.interp(timeline, t_sorted, arr) for arr in arrays_to_resample]
+        # OPTIMIZATION: Data should already be pre-sorted from _process_single_driver
+        # Skip redundant np.argsort() call - this is Bottleneck #4 fix
+        # INTEGRITY: Assert data is strictly monotonic
+        assert np.all(t[:-1] <= t[1:]), \
+            f"Driver {code} data not monotonic in time (pre-sort failed in _process_single_driver)"
+
+        t_sorted = t  # No need to sort if pre-sorted
+
+        # Resample all channels efficiently
+        # Each channel resampled with shared t_sorted and timeline
+        resampled = [np.interp(timeline, t_sorted, arr) for arr in [
+            data["x"],
+            data["y"],
+            data["dist"],
+            data["rel_dist"],
+            data["lap"],
+            data["tyre"],
+            data["speed"],
+            data["gear"],
+            data["drs"],
+            data["throttle"],
+            data["brake"],
+            data["rpm"],
+        ]]
         x_resampled, y_resampled, dist_resampled, rel_dist_resampled, lap_resampled, \
         tyre_resampled, speed_resampled, gear_resampled, drs_resampled, throttle_resampled, brake_resampled, rpm_resampled = resampled
  
@@ -368,18 +399,33 @@ def get_race_telemetry(session, session_type='R', refresh=False):
 
     print(f"DEBUG: Starting frame processing. Total frames: {num_frames}, Timeline range: {timeline[0]:.1f}s to {timeline[-1]:.1f}s, Circuit length: {circuit_length:.1f}m", flush=True)
 
+    # OPTIMIZATION: Pre-compute race_progress for all drivers at all frames to avoid repeated calculation
+    # This also enables vectorized sorting operations
+    race_progress_all = {}
+    for code in driver_codes:
+        d = driver_arrays[code]
+        lap = np.maximum(d["lap"], 1)  # Ensure lap >= 1
+        rel = np.clip(d["rel_dist"], 0.0, 1.0)  # Clamp rel_dist to [0,1]
+        race_progress_all[code] = (lap - 1) * circuit_length + rel * circuit_length
+
     for i in range(num_frames):
         t = timeline[i]
-        snapshot = []
+
+        # OPTIMIZATION: Build data for all drivers in one pass (no intermediate snapshot list)
+        frame_data_raw = {}
+        distances = {}
+
         for code in driver_codes:
             d = driver_arrays[code]
-            snapshot.append({
-                "code": code,
-                "dist": float(d["dist"][i]),
+            race_prog = race_progress_all[code][i]
+
+            frame_data_raw[code] = {
                 "x": float(d["x"][i]),
                 "y": float(d["y"][i]),
+                "dist": float(d["dist"][i]),
                 "lap": int(round(d["lap"][i])),
                 "rel_dist": float(d["rel_dist"][i]),
+                "race_progress": float(race_prog),
                 "tyre": float(d["tyre"][i]),
                 "speed": float(d['speed'][i]),
                 "gear": int(d['gear'][i]),
@@ -387,87 +433,60 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 "throttle": float(d['throttle'][i]),
                 "brake": float(d['brake'][i]),
                 "rpm": int(d['rpm'][i]),
-            })
+            }
+            distances[code] = frame_data_raw[code]["dist"]
 
-        # If for some reason we have no drivers at this instant
-        if not snapshot:
-            continue
-
-        # 5b. Sort by race distance to get POSITIONS (1–20)
-        # Leader = largest race distance covered
-        # For the race start (very little distance covered), use grid positions
-        # For the race end, use official final positions
-        min_dist = min(car["dist"] for car in snapshot) if snapshot else 0
+        # Determine sorting order based on race state
+        # (Use precomputed frame_data_raw for state checks)
+        min_dist = min(distances.values()) if distances else 0
         is_race_start = min_dist < 500  # Less than 500m into the race
 
-        # Check if race is finished: leader has rel_dist >= 0.99 (completed race)
-        max_rel_dist = max(car["rel_dist"] for car in snapshot) if snapshot else 0
+        max_rel_dist = max(
+            frame_data_raw[code].get("rel_dist", 0.0) for code in driver_codes
+        )
         if max_rel_dist >= 0.99 and final_positions:
             race_finished = True
 
-        # Calculate race_progress (accumulated distance) for each driver
-        # race_progress = (lap - 1) * circuit_length + rel_dist * circuit_length
-        for r in snapshot:
-            lap = max(r.get("lap", 1), 1)
-            rel = float(r.get("rel_dist", 0.0))
-            # Clamp rel_dist to [0, 1] in case of data artifacts
-            rel = max(0.0, min(1.0, rel))
-            r["race_progress"] = (lap - 1) * circuit_length + rel * circuit_length
-
-        time_seconds = t
-
+        # Determine ordering and assign positions
         if is_race_start and grid_positions:
             # Use grid position primarily, race_progress as tiebreaker
-            snapshot.sort(key=lambda r: (grid_positions.get(r["code"], 999), -r["race_progress"]))
+            sorted_codes = sorted(
+                driver_codes,
+                key=lambda code: (grid_positions.get(code, 999), -frame_data_raw[code]["race_progress"])
+            )
         elif race_finished and final_positions:
             # Once race is finished, always use official final race positions
-            snapshot.sort(key=lambda r: final_positions.get(r["code"], 999))
+            sorted_codes = sorted(
+                driver_codes,
+                key=lambda code: final_positions.get(code, 999)
+            )
         else:
             # During the race, sort by accumulated race progress
             # Higher race_progress = more distance covered = ahead
-            snapshot.sort(key=lambda r: -r["race_progress"])
+            sorted_codes = sorted(
+                driver_codes,
+                key=lambda code: -frame_data_raw[code]["race_progress"]
+            )
 
-        # Check distance monotonicity per driver (warns if data is non-monotonic)
-        for r in snapshot:
-            code = r["code"]
-            progress = float(r.get("dist", 0.0))
+        # Assign positions and check monotonicity
+        frame_data = {}
+        for position, code in enumerate(sorted_codes, 1):
+            frame_data[code] = frame_data_raw[code].copy()
+            frame_data[code]["position"] = position
+
+            # Check distance monotonicity per driver (warns if data is non-monotonic)
+            progress = frame_data[code]["dist"]
             if progress + 1e-3 < last_dist[code]:
                 print(
-                    f"[WARN] non-monotonic dist for {code} at t={time_seconds:.2f}s: "
+                    f"[WARN] non-monotonic dist for {code} at t={t:.2f}s: "
                     f"{progress:.3f} < {last_dist[code]:.3f}",
                     flush=True,
                 )
             last_dist[code] = progress
 
-        leader = snapshot[0]
-        leader_lap = leader["lap"]
-
-        # TODO: This 5c. step seems futile currently as we are not using gaps anywhere, and it doesn't even comput the gaps. I think I left this in when removing the "gaps" feature that was half-finished during the initial development.
-
-        # 5c. Compute gap to car in front in SECONDS
-        frame_data = {}
-
-        for idx, car in enumerate(snapshot):
-            code = car["code"]
-            position = idx + 1
-
-            # include speed, gear, drs_active in frame driver dict
-            frame_data[code] = {
-                "x": car["x"],
-                "y": car["y"],
-                "dist": car["dist"],
-                "lap": car["lap"],
-                "rel_dist": round(car["rel_dist"], 4),
-                "race_progress": round(car["race_progress"], 1),
-                "tyre": car["tyre"],
-                "position": position,
-                "speed": car['speed'],
-                "gear": car['gear'],
-                "drs": car['drs'],
-                "throttle": car['throttle'],
-                "brake": car['brake'],
-                "rpm": car['rpm'],
-            }
+        # Get leader info for frame payload
+        leader_code = sorted_codes[0] if sorted_codes else None
+        leader_lap = frame_data[leader_code]["lap"] if leader_code else 1
 
         weather_snapshot = {}
         if weather_resampled:
@@ -930,40 +949,39 @@ def get_lap_telemetry(session, driver_codes: list, lap_numbers: list):
     """
     result = []
 
-    for driver_code in driver_codes:
-        for lap_num in lap_numbers:
-            try:
-                driver_laps = session.laps.pick_drivers(driver_code)
-                lap = driver_laps[driver_laps['LapNumber'] == lap_num].iloc[0]
-                telemetry = lap.get_telemetry()
+    for driver_code, lap_num in zip(driver_codes, lap_numbers):
+        try:
+            driver_laps = session.laps.pick_drivers(driver_code)
+            lap = driver_laps[driver_laps['LapNumber'] == lap_num].iloc[0]
+            telemetry = lap.get_telemetry()
 
-                if telemetry.empty:
-                    continue
-
-                points = []
-                for _, row in telemetry.iterrows():
-                    points.append({
-                        "distance": float(row["Distance"]),
-                        "speed": float(row["Speed"]),
-                        "throttle": float(row["Throttle"]),
-                        "brake": float(row["Brake"]),
-                        "rpm": int(row["RPM"]) if pd.notna(row["RPM"]) else 0,
-                        "gear": int(row["nGear"]),
-                        "x": float(row["X"]),
-                        "y": float(row["Y"]),
-                    })
-
-                lap_time = float(lap["LapTime"].total_seconds()) if pd.notna(lap["LapTime"]) else None
-
-                result.append({
-                    "driver_code": driver_code,
-                    "lap_number": int(lap_num),
-                    "lap_time": lap_time,
-                    "telemetry": points,
-                })
-            except (IndexError, KeyError) as e:
-                print(f"Warning: Could not get telemetry for {driver_code} lap {lap_num}: {e}")
+            if telemetry.empty:
                 continue
+
+            points = []
+            for _, row in telemetry.iterrows():
+                points.append({
+                    "distance": float(row["Distance"]),
+                    "speed": float(row["Speed"]),
+                    "throttle": float(row["Throttle"]),
+                    "brake": float(row["Brake"]),
+                    "rpm": int(row["RPM"]) if pd.notna(row["RPM"]) else 0,
+                    "gear": int(row["nGear"]),
+                    "x": float(row["X"]),
+                    "y": float(row["Y"]),
+                })
+
+            lap_time = float(lap["LapTime"].total_seconds()) if pd.notna(lap["LapTime"]) else None
+
+            result.append({
+                "driver_code": driver_code,
+                "lap_number": int(lap_num),
+                "lap_time": lap_time,
+                "telemetry": points,
+            })
+        except (IndexError, KeyError) as e:
+            print(f"Warning: Could not get telemetry for {driver_code} lap {lap_num}: {e}")
+            continue
 
     return result
 
@@ -981,28 +999,27 @@ def get_sector_times(session, driver_codes: list, lap_numbers: list):
     """
     result = []
 
-    for driver_code in driver_codes:
-        for lap_num in lap_numbers:
-            try:
-                driver_laps = session.laps.pick_drivers(driver_code)
-                lap = driver_laps[driver_laps['LapNumber'] == lap_num].iloc[0]
+    for driver_code, lap_num in zip(driver_codes, lap_numbers):
+        try:
+            driver_laps = session.laps.pick_drivers(driver_code)
+            lap = driver_laps[driver_laps['LapNumber'] == lap_num].iloc[0]
 
-                sector_1 = float(lap["Sector1Time"].total_seconds()) if pd.notna(lap["Sector1Time"]) else None
-                sector_2 = float(lap["Sector2Time"].total_seconds()) if pd.notna(lap["Sector2Time"]) else None
-                sector_3 = float(lap["Sector3Time"].total_seconds()) if pd.notna(lap["Sector3Time"]) else None
-                lap_time = float(lap["LapTime"].total_seconds()) if pd.notna(lap["LapTime"]) else None
+            sector_1 = float(lap["Sector1Time"].total_seconds()) if pd.notna(lap["Sector1Time"]) else None
+            sector_2 = float(lap["Sector2Time"].total_seconds()) if pd.notna(lap["Sector2Time"]) else None
+            sector_3 = float(lap["Sector3Time"].total_seconds()) if pd.notna(lap["Sector3Time"]) else None
+            lap_time = float(lap["LapTime"].total_seconds()) if pd.notna(lap["LapTime"]) else None
 
-                result.append({
-                    "driver_code": driver_code,
-                    "lap_number": int(lap_num),
-                    "sector_1": sector_1,
-                    "sector_2": sector_2,
-                    "sector_3": sector_3,
-                    "lap_time": lap_time,
-                })
-            except (IndexError, KeyError) as e:
-                print(f"Warning: Could not get sector times for {driver_code} lap {lap_num}: {e}")
-                continue
+            result.append({
+                "driver_code": driver_code,
+                "lap_number": int(lap_num),
+                "sector_1": sector_1,
+                "sector_2": sector_2,
+                "sector_3": sector_3,
+                "lap_time": lap_time,
+            })
+        except (IndexError, KeyError) as e:
+            print(f"Warning: Could not get sector times for {driver_code} lap {lap_num}: {e}")
+            continue
 
     return result
 

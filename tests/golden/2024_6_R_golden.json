@@ -1,0 +1,187 @@
+{
+  "metadata": {
+    "year": 2024,
+    "round": 6,
+    "session_type": "R",
+    "name": "medium_race"
+  },
+  "frame_count": 138157,
+  "driver_codes": [
+    "ALB",
+    "ALO",
+    "BOT",
+    "GAS",
+    "HAM",
+    "HUL",
+    "LEC",
+    "MAG",
+    "NOR",
+    "OCO",
+    "PER",
+    "PIA",
+    "RIC",
+    "RUS",
+    "SAI",
+    "SAR",
+    "STR",
+    "TSU",
+    "VER",
+    "ZHO"
+  ],
+  "first_frame": {
+    "t": 0.0,
+    "lap": 1,
+    "leaders": [
+      "ALB",
+      "ALO",
+      "BOT",
+      "GAS",
+      "HAM",
+      "HUL",
+      "LEC",
+      "MAG",
+      "NOR",
+      "OCO",
+      "PER",
+      "PIA",
+      "RIC",
+      "RUS",
+      "SAI",
+      "SAR",
+      "STR",
+      "TSU",
+      "VER",
+      "ZHO"
+    ]
+  },
+  "last_frame": {
+    "t": 5526.24,
+    "lap": 57,
+    "leaders": [
+      "ALB",
+      "ALO",
+      "BOT",
+      "GAS",
+      "HAM",
+      "HUL",
+      "LEC",
+      "MAG",
+      "NOR",
+      "OCO",
+      "PER",
+      "PIA",
+      "RIC",
+      "RUS",
+      "SAI",
+      "SAR",
+      "STR",
+      "TSU",
+      "VER",
+      "ZHO"
+    ]
+  },
+  "sample_frames": {
+    "frame_0": {
+      "t": 0.0,
+      "lap": 1,
+      "positions": {
+        "VER": 1,
+        "LEC": 2,
+        "SAI": 3,
+        "PER": 4,
+        "NOR": 5,
+        "PIA": 6,
+        "RUS": 7,
+        "HAM": 8,
+        "HUL": 9,
+        "TSU": 10,
+        "STR": 11,
+        "GAS": 12,
+        "OCO": 13,
+        "ALB": 14,
+        "ALO": 15,
+        "BOT": 16,
+        "SAR": 17,
+        "MAG": 18,
+        "ZHO": 19,
+        "RIC": 20
+      },
+      "sample_values": {
+        "VER": {
+          "x": 2826.980825291397,
+          "y": -493.98921563052807,
+          "speed": 0.0,
+          "dist": 0.00247639765158782
+        }
+      }
+    },
+    "frame_69078": {
+      "t": 2763.12,
+      "lap": 29,
+      "positions": {
+        "VER": 1,
+        "LEC": 2,
+        "SAI": 3,
+        "PER": 4,
+        "NOR": 5,
+        "PIA": 6,
+        "RUS": 7,
+        "HAM": 8,
+        "HUL": 9,
+        "TSU": 10,
+        "STR": 11,
+        "GAS": 12,
+        "OCO": 13,
+        "ALB": 14,
+        "ALO": 15,
+        "BOT": 16,
+        "SAR": 17,
+        "MAG": 18,
+        "ZHO": 19,
+        "RIC": 20
+      },
+      "sample_values": {
+        "VER": {
+          "x": 2017.510266382774,
+          "y": 905.0567482183997,
+          "speed": 136.0,
+          "dist": 4364.415868871437
+        }
+      }
+    },
+    "frame_138156": {
+      "t": 5526.24,
+      "lap": 57,
+      "positions": {
+        "NOR": 1,
+        "VER": 2,
+        "LEC": 3,
+        "PER": 4,
+        "SAI": 5,
+        "HAM": 6,
+        "TSU": 7,
+        "RUS": 8,
+        "ALO": 9,
+        "OCO": 10,
+        "HUL": 11,
+        "GAS": 12,
+        "PIA": 13,
+        "ZHO": 14,
+        "RIC": 15,
+        "BOT": 16,
+        "STR": 17,
+        "ALB": 18,
+        "MAG": 19,
+        "SAR": 20
+      },
+      "sample_values": {
+        "NOR": {
+          "x": 1820.9620360629983,
+          "y": 139.95770725078418,
+          "speed": 250.4750144,
+          "dist": 5328.481146683782
+        }
+      }
+    }
+  }
+}

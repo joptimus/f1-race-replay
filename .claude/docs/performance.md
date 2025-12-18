@@ -131,7 +131,7 @@ result = {key: np.concatenate(all_data[key])[order] for key in all_data}
 
 **Location:** `shared/telemetry/f1_data.py`, lines 371-496 in `get_race_telemetry()`
 
-**Issue:** Builds frame data with unnecessary intermediate structures and redundant operations.
+**Issue:** The current O(N⋅DlogD) logic (sorting drivers inside every frame loop) is the primary cause of slow replay generation. Additionally, creating thousands of Python dictionaries causes GC overhead.
 
 ```python
 for i in range(num_frames):
@@ -148,7 +148,7 @@ for i in range(num_frames):
             # ... 8 more conversions ...
         })
 
-    # Sorts snapshot list O(n log n) per frame
+    # Sorts snapshot list O(n log n) per frame (2000 frames = 40,000+ sorts!)
     snapshot.sort(key=lambda r: -r["race_progress"])
 
     # Copies data again from snapshot to frame_data
@@ -164,7 +164,7 @@ for i in range(num_frames):
 ```
 
 **Why it's inefficient:**
-- Creates 520,000+ dictionary allocations (2000 frames × 20 drivers × 13 fields)
+- Creates 520,000+ dictionary allocations (2000 frames × 20 drivers × 13 fields) → heavy GC pressure
 - Sorts driver list per frame O(n log n) × 2000 = ~40,000 sorting operations
 - Copies data from `snapshot` to `frame_data` (second dict creation per frame)
 - Type conversions on already-converted values
@@ -174,121 +174,272 @@ for i in range(num_frames):
 
 ### Solution
 
-**Direct Frame Building Without Intermediate Structures**
+**Use Structured NumPy Array Instead of Dictionaries**
+
+Pre-allocate a structured 2D array and avoid dictionary overhead entirely:
 
 ```python
+import numpy as np
+from numpy.core import records
+
+# Define structured dtype matching frame fields
+frame_dtype = np.dtype([
+    ('code', 'U4'),        # Driver code (4 chars)
+    ('x', 'f8'),          # X coordinate
+    ('y', 'f8'),          # Y coordinate
+    ('dist', 'f8'),       # Race distance
+    ('lap', 'i4'),        # Lap number
+    ('rel_dist', 'f8'),   # Relative distance (0-1)
+    ('tyre', 'i2'),       # Tyre compound
+    ('speed', 'f4'),      # Speed (km/h)
+    ('gear', 'i1'),       # Gear
+    ('drs', 'i1'),        # DRS status
+    ('throttle', 'f4'),   # Throttle
+    ('brake', 'f4'),      # Brake
+    ('rpm', 'i2'),        # RPM
+    ('position', 'i1'),   # Race position
+])
+
+# Pre-allocate frame array
+num_drivers = len(driver_codes)
+frame_array = np.zeros(num_drivers, dtype=frame_dtype)
+
+# Initialize driver codes (constant across all frames)
+for j, code in enumerate(driver_codes):
+    frame_array['code'][j] = code
+
+# Now the main loop (no intermediate snapshots, no per-frame sorts)
 for i in range(num_frames):
-    # Pre-compute indices and values for this frame
-    frame_data = {}
-    distances = {}
-
-    for code in driver_codes:
+    # Populate all drivers for this frame in one operation
+    for j, code in enumerate(driver_codes):
         d = driver_arrays[code]
-        distances[code] = d["dist"][i]
+        frame_array['x'][j] = d["x"][i]
+        frame_array['y'][j] = d["y"][i]
+        frame_array['dist'][j] = d["dist"][i]
+        frame_array['lap'][j] = int(round(d["lap"][i]))
+        frame_array['rel_dist'][j] = d["rel_dist"][i]
+        frame_array['tyre'][j] = int(d["tyre"][i])
+        frame_array['speed'][j] = d["speed"][i]
+        frame_array['gear'][j] = int(d["gear"][i])
+        frame_array['drs'][j] = int(d["drs"][i])
+        frame_array['throttle'][j] = d["throttle"][i]
+        frame_array['brake'][j] = d["brake"][i]
+        frame_array['rpm'][j] = int(d["rpm"][i])
 
-        # Build driver entry directly
-        frame_data[code] = {
-            "x": d["x"][i],
-            "y": d["y"][i],
-            "dist": d["dist"][i],
-            "lap": int(round(d["lap"][i])),
-            "rel_dist": d["rel_dist"][i],
-            "tyre": int(d["tyre"][i]),
-            "speed": d["speed"][i],
-            "gear": int(d["gear"][i]),
-            "drs": int(d["drs"][i]),
-            "throttle": d["throttle"][i],
-            "brake": d["brake"][i],
-            "rpm": int(d["rpm"][i]),
+    # Sort by race_progress (preserve existing race logic)
+    # But use argsort once per frame (much faster)
+    sort_indices = np.argsort(-frame_array['dist'])
+    sorted_frame = frame_array[sort_indices]
+
+    # Assign positions
+    for pos in range(num_drivers):
+        sorted_frame['position'][pos] = pos + 1
+
+    # Convert to dict format for JSON serialization (only when needed)
+    frame_dict = {
+        "t": t_array[i],
+        "lap": leader_lap[i],
+        "drivers": {}
+    }
+
+    for j, code in enumerate(sorted_frame['code']):
+        frame_dict["drivers"][code] = {
+            "x": float(sorted_frame['x'][j]),
+            "y": float(sorted_frame['y'][j]),
+            "dist": float(sorted_frame['dist'][j]),
+            "lap": int(sorted_frame['lap'][j]),
+            "rel_dist": float(sorted_frame['rel_dist'][j]),
+            "tyre": int(sorted_frame['tyre'][j]),
+            "speed": float(sorted_frame['speed'][j]),
+            "gear": int(sorted_frame['gear'][j]),
+            "drs": int(sorted_frame['drs'][j]),
+            "throttle": float(sorted_frame['throttle'][j]),
+            "brake": float(sorted_frame['brake'][j]),
+            "rpm": int(sorted_frame['rpm'][j]),
+            "position": int(sorted_frame['position'][j]),
         }
 
-    # Sort codes by distance once
-    sorted_codes = sorted(distances.keys(), key=lambda c: -distances[c])
-
-    # Add position field without creating new dicts
-    for position, code in enumerate(sorted_codes, 1):
-        frame_data[code]["position"] = position
-
-    # Rest of race logic...
+    frames.append(frame_dict)
 ```
 
-**Rationale:**
-- Eliminates intermediate `snapshot` list allocation
-- Single sort on codes (20 items) not driver data structures
-- Avoids copying data between dicts
-- Keeps frame_data as single source of truth
+**CRITICAL IMPLEMENTATION NOTES:**
+
+1. **Preserve Race Logic Verbatim** - The existing code has nuanced ordering:
+   - Grid positions at race start
+   - Dynamic race progress during race
+   - Final classification once race finishes
+   - Keep all three ordering modes unchanged
+
+2. **Keep Monotonicity Checks** - The `last_dist` warning is valuable debugging:
+   ```python
+   # Retain this check, just move it after position calculation
+   for j, code in enumerate(sorted_frame['code']):
+       progress = sorted_frame['dist'][j]
+       if progress + 1e-3 < last_dist[code]:
+           print(f"[WARN] non-monotonic dist for {code}")
+       last_dist[code] = progress
+   ```
+
+3. **Data Integrity** - Add golden file comparison before/after to verify:
+   - Same frame count
+   - Same leader per frame
+   - Same driver order per frame
+   - Same float values within tolerance
 
 **Benefits:**
+- Eliminates dictionary allocation overhead (~520K dicts → ~2K numpy ops)
+- Single NumPy array sort per frame is ~10-20x faster than Python list sort
+- No Python GC pressure on dictionary objects
+- Minimal memory footprint (structured array is contiguous, cache-friendly)
 - 20-30% reduction in frame building time
-- Fewer memory allocations (critical for large races)
-- Clearer code flow
 
-**Effort:** Medium (2-3 hours coding + testing)
-**Risk:** Low (output structure unchanged, verify position field correctness)
+**Effort:** Medium (3-4 hours coding, integration, golden file validation)
+**Risk:** Low IF you preserve race logic verbatim and validate with golden files
 
 ---
 
-## 3. High Priority: Session Reloading in API Layer
+## 3. High Priority: Session Caching at API Layer
 
 ### Problem
 
 **Location:** `backend/app/api/telemetry.py`, lines 14-26
 
-**Issue:** Every telemetry API request reloads the entire FastF1 session from scratch.
+**Issue:** Every telemetry API request reloads the entire FastF1 session from scratch. `session.load()` is a massive time-sink (5-30 seconds).
 
 ```python
 @router.post("/laps", response_model=LapTelemetryResponse)
 async def get_lap_telemetry_endpoint(request: LapTelemetryRequest):
     try:
-        # load_session() reloads from FastF1 every time
+        # load_session() reloads from FastF1 every time (EXPENSIVE!)
         session = load_session(request.year, request.round_num, request.session_type)
         laps_data = get_lap_telemetry(session, request.driver_codes, request.lap_numbers)
 ```
 
 **Why it's inefficient:**
 - Multiple API calls for different data (laps, sectors, weather) each trigger full reload
-- Session loading takes 5-30 seconds depending on data availability
+- Session loading takes 5-30 seconds depending on data availability and network
 - No request deduplication for simultaneous clients
-- No caching at API layer
+- Session objects contain lots of unneeded metadata
 
 **Performance Impact:** 5-30 second delay per endpoint call
 
 ### Solution
 
-**Session Cache with Locking**
+**Option A (Recommended): Cache Processed Telemetry Arrays (Not Session Objects)**
 
-Implement a session cache decorator that loads once and reuses:
+Don't just cache the Session object; it contains too much metadata. Instead, cache the final processed telemetry arrays using feather format (fast I/O):
 
 ```python
-from functools import lru_cache
+import pyarrow.feather as feather
+import os
+from pathlib import Path
+
+_telemetry_cache = {}  # {key: telemetry_array}
+_cache_lock = asyncio.Lock()
+
+async def get_cached_telemetry(year: int, round_num: int, session_type: str):
+    """Load or compute telemetry, cached to disk via feather format."""
+    cache_key = f"{year}_{round_num}_{session_type}"
+    cache_file = Path(f"cache/telemetry/{cache_key}.feather")
+
+    # Try in-memory cache first (fastest)
+    if cache_key in _telemetry_cache:
+        return _telemetry_cache[cache_key]
+
+    # Try disk cache (fast I/O with feather)
+    if cache_file.exists():
+        telemetry = feather.read_table(str(cache_file)).to_pandas()
+        _telemetry_cache[cache_key] = telemetry
+        return telemetry
+
+    # Compute if not cached
+    async with _cache_lock:
+        # Double-check after acquiring lock
+        if cache_key in _telemetry_cache:
+            return _telemetry_cache[cache_key]
+
+        if cache_file.exists():
+            telemetry = feather.read_table(str(cache_file)).to_pandas()
+            _telemetry_cache[cache_key] = telemetry
+            return telemetry
+
+        # Load session and extract telemetry (expensive operation)
+        session = load_session(year, round_num, session_type)
+        telemetry = get_race_telemetry(session, refresh=False)
+
+        # Save to disk (non-blocking, optional)
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        asyncio.create_task(_save_feather_async(cache_file, telemetry))
+
+        _telemetry_cache[cache_key] = telemetry
+        return telemetry
+
+async def _save_feather_async(path: Path, data: pd.DataFrame):
+    """Save feather in background."""
+    try:
+        feather.write_table(pa.Table.from_pandas(data), str(path))
+    except Exception as e:
+        print(f"[WARN] Failed to save cache: {e}")
+```
+
+**Benefits:**
+- Feather format: 5-10x faster I/O than pickle
+- Near-instant subsequent requests (disk cache hit in <100ms)
+- No mutability issues (unlike Session objects)
+- Memory-efficient: only load what's needed
+- Background save doesn't block requests
+
+**Why feather over pickle:**
+- Feather: Apache Arrow format, designed for rapid I/O across languages
+- Pickle: Python-specific, slower serialization, security risks with untrusted data
+
+---
+
+**Option B: Simple In-Memory Session Cache with Locking**
+
+If you prefer to keep the Session object for flexibility:
+
+```python
 from asyncio import Lock
 
-_session_cache = {}
-_session_locks = {}
+_session_cache = {}  # {key: session}
+_session_locks = {}  # {key: Lock}
 
 async def get_cached_session(year: int, round_num: int, session_type: str):
-    """Load session once and cache for reuse."""
+    """Load session once and cache in memory."""
     cache_key = f"{year}_{round_num}_{session_type}"
 
-    # Use lock to prevent duplicate loads
+    # Create lock if not exists
     if cache_key not in _session_locks:
         _session_locks[cache_key] = Lock()
 
+    # Use lock to prevent duplicate loads
     async with _session_locks[cache_key]:
         if cache_key not in _session_cache:
-            # Load session (single operation)
+            # Load session (single operation, others wait)
             _session_cache[cache_key] = load_session(year, round_num, session_type)
 
     return _session_cache[cache_key]
 
-# Usage in endpoints
+# Usage
 @router.post("/laps")
 async def get_lap_telemetry_endpoint(request: LapTelemetryRequest):
     session = await get_cached_session(request.year, request.round_num, request.session_type)
     laps_data = get_lap_telemetry(session, request.driver_codes, request.lap_numbers)
 ```
 
-**Alternative: Add Cache Expiration**
+**Benefits:**
+- Prevents duplicate loads for concurrent requests
+- Simple to implement
+- Backward compatible (uses Session object)
+
+**Drawback:**
+- In-memory cache unbounded (can grow large)
+- Must ensure Session object is never mutated
+
+---
+
+**Option C: Add Cache Expiration (TTL)**
 
 ```python
 import time
@@ -312,13 +463,16 @@ async def get_cached_session(year: int, round_num: int, session_type: str):
     return session
 ```
 
-**Benefits:**
-- Eliminates 5-30 second delays on subsequent requests
-- Supports multiple concurrent client requests without duplication
-- Simple implementation, low risk
+**CRITICAL NOTES:**
 
-**Effort:** Low (1-2 hours)
-**Risk:** Low (cache miss falls back to load, can add TTL for safety)
+1. **Don't accidentally mutate cached Session object** - FastF1 sessions may have internal state; ensure you don't modify them.
+2. **Feather requires PyArrow** - Add to `requirements.txt`: `pyarrow>=10.0.0`
+3. **Thread-safety** - Use asyncio.Lock (not threading.Lock) for async context
+
+**Recommendation:** Use **Option A** (feather caching) for production. It's the fastest for subsequent requests and scales well.
+
+**Effort:** Low (2-3 hours including disk I/O testing)
+**Risk:** Low (cache miss falls back to load, can add TTL or invalidation for safety)
 
 ---
 
@@ -328,7 +482,7 @@ async def get_cached_session(year: int, round_num: int, session_type: str):
 
 **Location:** `shared/telemetry/f1_data.py`, lines 243-284 in `get_race_telemetry()`
 
-**Issue:** Uses 12 separate `np.interp()` calls per driver and recalculates sort order.
+**Issue:** Uses 12 separate `np.interp()` calls per driver and recalculates sort order unnecessarily.
 
 ```python
 for code, data in driver_data.items():
@@ -342,47 +496,133 @@ for code, data in driver_data.items():
 
 **Why it's inefficient:**
 - Data reordering should be complete from `_process_single_driver()` (fix from bottleneck #1)
-- Multiple `np.interp()` calls with repeated timeline and t_sorted
-- No vectorized operation for batch interpolation
+- Multiple `np.interp()` calls with repeated timeline and t_sorted overhead
+- No sharing of interpolation coefficients across channels
 
 **Performance Impact:** 15-25% of resampling time
 
 ### Solution
 
-**Verify Pre-sorted Data, Batch Interpolation**
+**Verify Pre-sorted Data and Optimize Interpolation**
+
+After fixing bottleneck #1 (ensuring `_process_single_driver` returns pre-sorted data), you can streamline resampling:
 
 ```python
 for code, data in driver_data.items():
     t = data["t"] - global_t_min
 
-    # If data is pre-sorted from _process_single_driver, skip sort
-    # (add assertion to verify)
-    assert np.all(t[:-1] <= t[1:]), f"Driver {code} data not monotonic"
+    # INTEGRITY: Assert data is strictly monotonic (pre-sorted from _process_single_driver)
+    assert np.all(t[:-1] <= t[1:]), f"Driver {code} data not monotonic in time"
 
-    # Create 2D array for batch interpolation
-    arrays_2d = np.array([
+    # Reuse t_sorted and timeline across all interpolations (avoid recomputation)
+    # Keep the existing list-comprehension pattern (safest for data integrity)
+    t_sorted = t  # No need to sort if pre-sorted
+
+    resampled = [np.interp(timeline, t_sorted, arr) for arr in [
         data["x"],
         data["y"],
         data["dist"],
-        # ... all arrays ...
-    ])
-
-    # Single batch operation (10-30% faster than individual calls)
-    resampled = np.interp(timeline, t, arrays_2d, axis=1)
+        data["rel_dist"],
+        data["lap"],
+        data["tyre"],
+        data["speed"],
+        data["gear"],
+        data["drs"],
+        data["throttle"],
+        data["brake"],
+        data["rpm"],
+    ]]
 
     # Unpack back into dict
-    for i, key in enumerate(array_keys):
-        driver_data[code][key] = resampled[i]
+    result_dict = {}
+    for key, resampled_arr in zip(
+        ["x", "y", "dist", "rel_dist", "lap", "tyre", "speed", "gear", "drs", "throttle", "brake", "rpm"],
+        resampled
+    ):
+        result_dict[key] = resampled_arr
+
+    driver_data[code] = result_dict
 ```
 
-**Benefits:**
-- Eliminates redundant sort operations
-- Vectorized batch interpolation (NumPy faster for multi-column)
-- Simpler, more maintainable code
-- Depends on fixing bottleneck #1
+**Advanced Option: Use scipy.interpolate for True Batch Interpolation**
 
-**Effort:** Low (1-2 hours)
-**Risk:** Low (depends on bottleneck #1 being fixed first)
+If profiling shows resampling is still a hotspot after fixing bottleneck #1, use scipy:
+
+```python
+from scipy.interpolate import interp1d
+import numpy as np
+
+for code, data in driver_data.items():
+    t = data["t"] - global_t_min
+
+    # INTEGRITY: Assert strictly monotonic
+    assert np.all(t[:-1] <= t[1:]), f"Driver {code} data not monotonic in time"
+
+    # Stack all telemetry channels into 2D array [num_channels, num_points]
+    channels = np.vstack([
+        data["x"],
+        data["y"],
+        data["dist"],
+        data["rel_dist"],
+        data["lap"],
+        data["tyre"],
+        data["speed"],
+        data["gear"],
+        data["drs"],
+        data["throttle"],
+        data["brake"],
+        data["rpm"],
+    ])
+
+    # Batch interpolation using scipy (handles multiple channels efficiently)
+    interpolator = interp1d(
+        t,
+        channels,
+        kind='linear',
+        axis=1,
+        bounds_error=False,
+        fill_value='extrapolate'
+    )
+
+    resampled = interpolator(timeline)
+
+    # Unpack channels back into dict
+    result_dict = {}
+    for key, idx in [
+        ("x", 0), ("y", 1), ("dist", 2), ("rel_dist", 3), ("lap", 4),
+        ("tyre", 5), ("speed", 6), ("gear", 7), ("drs", 8),
+        ("throttle", 9), ("brake", 10), ("rpm", 11),
+    ]:
+        result_dict[key] = resampled[idx]
+
+    driver_data[code] = result_dict
+```
+
+**CRITICAL NOTES:**
+
+1. **DON'T change np.interp to use axis=1** - `np.interp()` doesn't support the axis parameter; this would cause a runtime error.
+
+2. **First verify pre-sorted data** - Depends on fixing bottleneck #1 correctly:
+   - Ensure `_process_single_driver` returns time arrays strictly monotonic
+   - Add assertions to catch any violations early
+   - Only skip the sort if 100% confident
+
+3. **scipy option is optional** - The basic list-comprehension pattern is safe and only ~5-10% slower than scipy.
+   - Only switch to scipy if profiling shows it's still a bottleneck
+   - scipy adds a dependency but is widely used
+
+**Benefits (Basic Option):**
+- Eliminates redundant sort operations (~5-10% improvement)
+- Simpler, verifiable code
+- No new dependencies
+
+**Benefits (scipy Option):**
+- True vectorized batch interpolation (~10-20% improvement)
+- Better cache utilization with stacked arrays
+- Professional scipy library handles edge cases
+
+**Effort:** Low (1-2 hours for basic, 2-3 hours for scipy)
+**Risk:** Low for basic (verified pre-sort), Medium for scipy (requires testing against baseline)
 
 ---
 
@@ -699,73 +939,335 @@ with Pool(processes=num_processes) as pool:
 
 ---
 
+## 9. Data Integrity Guardrails (Pre-Implementation Checklist)
+
+Before implementing any performance optimizations, establish a golden file baseline to validate that output data remains correct.
+
+### Golden File Testing
+
+Create baseline data files from 2-3 representative races (different race lengths, different driver counts):
+
+```python
+import json
+from pathlib import Path
+
+def create_golden_files():
+    """Generate baseline output for validation."""
+    test_races = [
+        (2024, 1, "R"),   # Short race
+        (2024, 6, "R"),   # Medium race
+        (2024, 22, "R"),  # Long race
+    ]
+
+    golden_dir = Path("tests/golden")
+    golden_dir.mkdir(exist_ok=True)
+
+    for year, round_num, session_type in test_races:
+        key = f"{year}_{round_num}_{session_type}"
+
+        # Get telemetry using current (unoptimized) implementation
+        frames = get_race_telemetry(
+            load_session(year, round_num, session_type),
+            refresh=False
+        )
+
+        # Save key metrics
+        golden = {
+            "frame_count": len(frames),
+            "driver_codes": list(frames[0]["drivers"].keys()) if frames else [],
+            "first_frame": {
+                "t": frames[0].get("t") if frames else None,
+                "leaders": [
+                    code for code, data in frames[0].get("drivers", {}).items()
+                ] if frames else []
+            },
+            "last_frame": {
+                "t": frames[-1].get("t") if frames else None,
+                "leaders": [
+                    code for code, data in frames[-1].get("drivers", {}).items()
+                ] if frames else []
+            },
+            "sample_frames": {
+                str(i): {
+                    "t": frames[i].get("t"),
+                    "leader": next(iter(frames[i]["drivers"])),
+                    "positions": {
+                        code: data.get("position")
+                        for code, data in frames[i].get("drivers", {}).items()
+                    }
+                }
+                for i in [0, len(frames)//2, len(frames)-1]
+                if frames
+            }
+        }
+
+        golden_file = golden_dir / f"{key}_golden.json"
+        with open(golden_file, "w") as f:
+            json.dump(golden, f, indent=2)
+
+        print(f"Created golden file: {golden_file}")
+```
+
+### Validation Script
+
+After each optimization, compare against golden files:
+
+```python
+def validate_against_golden(year: int, round_num: int, session_type: str):
+    """Compare new output against golden file."""
+    key = f"{year}_{round_num}_{session_type}"
+    golden_file = Path("tests/golden") / f"{key}_golden.json"
+
+    if not golden_file.exists():
+        print(f"[WARN] No golden file for {key}")
+        return True
+
+    # Load golden baseline
+    with open(golden_file, "r") as f:
+        golden = json.load(f)
+
+    # Get new output with optimized implementation
+    frames = get_race_telemetry(
+        load_session(year, round_num, session_type),
+        refresh=False
+    )
+
+    # Validate frame count
+    assert len(frames) == golden["frame_count"], \
+        f"Frame count mismatch: {len(frames)} vs {golden['frame_count']}"
+
+    # Validate first/last frames
+    assert frames[0].get("t") == golden["first_frame"]["t"], \
+        "First frame timestamp mismatch"
+
+    assert frames[-1].get("t") == golden["last_frame"]["t"], \
+        "Last frame timestamp mismatch"
+
+    # Validate sample frames (positions and leaders)
+    for frame_idx_str, expected in golden["sample_frames"].items():
+        frame_idx = int(frame_idx_str) if frame_idx_str != "last" else len(frames)-1
+        frame = frames[frame_idx]
+
+        actual_leader = next(iter(frame["drivers"]))
+        assert actual_leader == expected["leader"], \
+            f"Leader mismatch at frame {frame_idx}: {actual_leader} vs {expected['leader']}"
+
+        # Validate positions
+        for code, expected_pos in expected["positions"].items():
+            actual_pos = frame["drivers"][code].get("position")
+            assert actual_pos == expected_pos, \
+                f"Position mismatch for {code} at frame {frame_idx}: {actual_pos} vs {expected_pos}"
+
+    print(f"[OK] {key} passed validation")
+    return True
+```
+
+### Monotonicity & Integrity Checks
+
+Add runtime assertions to catch corrupted data early:
+
+```python
+def validate_monotonicity(frames: list, tolerance: float = 1e-3):
+    """Ensure driver distances increase monotonically per-driver per-frame."""
+    for frame_idx, frame in enumerate(frames):
+        for code, data in frame.get("drivers", {}).items():
+            dist = data.get("dist", 0.0)
+
+            # Check against previous frame
+            if frame_idx > 0:
+                prev_frame = frames[frame_idx - 1]
+                if code in prev_frame["drivers"]:
+                    prev_dist = prev_frame["drivers"][code].get("dist", 0.0)
+                    if dist + tolerance < prev_dist:
+                        print(f"[WARN] Non-monotonic distance for {code} at frame {frame_idx}: "
+                              f"{prev_dist} -> {dist}")
+
+def validate_no_nans(frames: list):
+    """Ensure no NaN values in critical fields."""
+    for frame_idx, frame in enumerate(frames):
+        for code, data in frame.get("drivers", {}).items():
+            for key in ["x", "y", "dist", "speed", "position"]:
+                val = data.get(key)
+                if isinstance(val, float) and math.isnan(val):
+                    raise ValueError(f"NaN found in {code}.{key} at frame {frame_idx}")
+```
+
+### Measurement Protocol
+
+For each optimization, measure:
+
+1. **Correctness** (must pass):
+   - Frame count unchanged
+   - Leader/position order matches golden file
+   - Float values within 1e-6 tolerance
+
+2. **Performance** (track):
+   - Processing time before/after (wall clock)
+   - Memory usage before/after
+   - Cache hit rates (if applicable)
+
+3. **Integrity** (must not regress):
+   - Monotonicity warnings count
+   - NaN detection
+   - Position ordering correctness
+
+---
+
 ## Implementation Roadmap
 
-### Phase 1: Critical Fixes (High ROI, Medium Effort)
-1. **Fix array concatenation & reordering** (Bottleneck #1) → 30-50% improvement
-2. **Direct frame building** (Bottleneck #2) → 20-30% improvement
-3. **Session caching at API layer** (Priority #3) → 5-30s improvement
-4. **Verify pre-sorted data** (Priority #4) → 15-25% improvement
+### Phase 1: Critical Fixes (40-60% Improvement, Golden File Validation)
 
-**Expected outcome:** 40-60% total telemetry processing improvement
+**Before starting:** Create golden files from 2-3 representative races (different lengths).
 
-### Phase 2: Supporting Optimizations (Medium ROI, Low Effort)
-5. **Frame serialization caching** → 20-30% WebSocket CPU improvement
-6. **Multiprocessing chunk size** → 10-20% multiprocessing improvement
-7. **WebSocket compression** → 30-40% bandwidth reduction
+1. **Fix array concatenation & reordering** (Bottleneck #1)
+   - Pre-sort lap intervals before concatenation
+   - Add monotonicity assertions
+   - Expected: 30-50% reduction in `_process_single_driver()` time
+   - Effort: 2-3 hours | Risk: Low (assertions catch corruption)
 
-### Phase 3: Advanced Optimizations (Low ROI, Medium Effort)
-8. **Async file I/O** → Event loop stability (needed if API heavily used)
-9. **Code cleanup** → Remove dead code, fix sys.exit() issues
+2. **Use Structured NumPy Arrays for Frame Building** (Bottleneck #2)
+   - Replace 520K+ dict allocations with single structured array
+   - Preserve race logic (grid/dynamic/final ordering) verbatim
+   - Keep monotonicity warning checks
+   - Expected: 20-30% reduction in frame building time
+   - Effort: 3-4 hours | Risk: Low (with golden file validation)
+
+3. **Session Caching with Feather Persistence** (Bottleneck #3)
+   - Cache processed telemetry arrays (not Session objects) to disk
+   - Use Apache Arrow feather format (5-10x faster I/O than pickle)
+   - Add in-memory cache + disk cache with background save
+   - Expected: 5-30 second improvement per request
+   - Effort: 2-3 hours | Risk: Low (cache miss falls back gracefully)
+
+4. **Verify Pre-sorted Data in Resampling** (Bottleneck #4)
+   - Ensure `_process_single_driver()` returns strictly monotonic time
+   - Skip redundant `np.argsort()` in `get_race_telemetry()`
+   - Add assertions to catch time violations
+   - Expected: 5-10% improvement in resampling
+   - Effort: 1-2 hours | Risk: Low (basic option, no scipy dependency)
+
+**Validation:** Run golden file tests after each fix. Target: 40-60% total improvement.
+
+---
+
+### Phase 2: Supporting Optimizations (Lower Priority)
+
+5. **Frame Serialization Caching** (20-30% WebSocket CPU)
+   - Pre-serialize all frames to JSON once during load
+   - Effort: 1 hour | Risk: Low
+
+6. **Multiprocessing Tuning** (10-20% improvement)
+   - Use `chunksize` parameter and `imap_unordered()`
+   - Effort: 1 hour | Risk: Low
+
+7. **WebSocket Compression** (30-40% bandwidth)
+   - Gzip with "Z/J" prefix pattern (safest option)
+   - Effort: 2-3 hours | Risk: Low
+
+---
+
+### Phase 3: Advanced / Deferred
+
+8. **Async File I/O** (Event loop stability)
+   - Only needed if API heavily used
+   - Adds complexity; defer until Phase 1 is stable
+   - Effort: 3-4 hours | Risk: Medium (async boundary changes)
+
+9. **Code Cleanup**
+   - Remove dead gap calculation code
+   - Fix `sys.exit()` calls in `list_rounds()` (prevents API crashes)
+   - Effort: 1-2 hours | Risk: Low
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests
-- Verify frame count unchanged before/after
-- Verify driver order matches expected positions
-- Verify field values match within tolerance (floating point)
+### Pre-Implementation: Golden File Baseline
+
+Create 2-3 representative test races covering different conditions:
+- Short race (20 drivers, ~50 laps) - e.g., 2024 Round 1
+- Medium race (20 drivers, ~60 laps) - e.g., 2024 Round 6
+- Long race (20 drivers, ~70+ laps) - e.g., 2024 Round 22
+
+For each race, save:
+- Frame count
+- Driver codes and ordering
+- First/middle/last frame metrics (leader, positions, distances)
+- Sample float values (x, y, speed) with full precision
+
+### Per-Optimization Testing
+
+**After each Phase 1 fix:**
+1. Run golden file validation (must pass without exception)
+2. Verify frame count matches baseline (±0)
+3. Verify leader ordering matches at key frames
+4. Compare position values within 1e-6 tolerance
+5. Check monotonicity warnings haven't increased
+
+**After Phase 1 completion:**
+- Performance benchmark: measure wall-clock time for telemetry generation
+- Memory profiling: compare peak memory usage before/after
+- Cache hit rate: track cache effectiveness (if applicable)
 
 ### Integration Tests
-- End-to-end replay with same session
-- Compare frame output between old/new implementation
-- Load test with multiple concurrent API requests
 
-### Performance Tests
-- Benchmark telemetry processing time before/after
-- Measure memory usage before/after
-- Profile WebSocket throughput and latency
-- Cache hit rate monitoring
+- End-to-end replay with same session (baseline vs. optimized)
+- Multiple concurrent API requests with session caching
+- Verify WebSocket frame delivery matches expected output
 
----
+### Performance Baselines
 
-## Risk Assessment
+Before starting any work:
+```bash
+# Record baseline timing
+time python -c "from shared.telemetry.f1_data import get_race_telemetry, load_session; \
+  session = load_session(2024, 6, 'R'); \
+  get_race_telemetry(session, refresh=False)"
 
-| Change | Risk Level | Mitigation |
-|--------|-----------|-----------|
-| Array reordering | Low | Validate output frames against baseline |
-| Frame building | Low | Verify position field correctness |
-| Session caching | Low | Add cache expiration, test cache invalidation |
-| Resampling | Low | Assertion on monotonicity, same output |
-| Frame serialization | Low | Cache miss validation |
-| WebSocket encoding | Medium | Requires frontend changes, test integration |
-| Async file I/O | Medium | Careful error handling, fallback to sync |
-| Multiprocessing | Low | Reorder results to match expected order |
+# Record baseline memory (use memory_profiler or top)
+```
+
+After each phase:
+```bash
+# Compare timing (target: 40-60% reduction for Phase 1)
+# Compare memory
+```
 
 ---
 
-## Estimated Impact Summary
+## Risk Assessment & Mitigation
 
-| Optimization | Processing Time Reduction | Difficulty | Priority |
-|--------------|--------------------------|-----------|----------|
-| Array concatenation fix | 30-50% | Medium | 1 |
-| Frame building direct | 20-30% | Medium | 1 |
-| Session caching | 5-30s per request | Low | 1 |
-| Resampling verification | 15-25% | Low | 2 |
-| Frame serialization cache | 20-30% WS CPU | Low | 2 |
-| Multiprocessing tuning | 10-20% | Low | 2 |
-| WebSocket compression | 30-40% bandwidth | Medium | 2 |
-| Async file I/O | Event loop stability | Medium | 3 |
+| Change | Risk Level | Why | Mitigation |
+|--------|-----------|-----|-----------|
+| Array reordering | Low | Assertion catches time violations | Add monotonicity asserts, validate golden files |
+| Frame building (NumPy) | Low | Output structure unchanged, same race logic | Preserve ordering logic verbatim, validate positions |
+| Session caching | Low | Cache miss falls back to load | Add TTL, validate cache invalidation, test concurrent requests |
+| Resampling (skip sort) | Low | Depends on Phase 1 being correct | Assert pre-sorted data, validate against golden file |
+| Frame serialization | Low | Straightforward caching | Verify cache hits, test both paths (cached/uncached) |
+| WebSocket encoding | Low | Gzip is well-tested | Test client decoding, measure CPU vs. bandwidth trade-off |
+| Async file I/O | Medium | Changes async boundaries | Only defer after Phase 1 stable, add comprehensive error handling |
+| Multiprocessing | Low | Reordering is simple | Verify output matches before/after |
 
-**Combined Phase 1 Impact:** ~50-80% reduction in telemetry processing time
+**Overall Risk Strategy:**
+- Golden file testing is your primary defense against silent data corruption
+- Assertions catch common issues early (time non-monotonicity, NaN)
+- Each optimization is small and focused
+- Can roll back changes individually if issues arise
+
+---
+
+## Summary: Expected Gains & Effort
+
+| Phase | Optimization | Performance Gain | Effort | Cumulative Gain |
+|-------|--------------|------------------|--------|-----------------|
+| 1 | Array concatenation | 30-50% | 2-3h | 30-50% |
+| 1 | Frame building (NumPy) | 20-30% | 3-4h | 44-65% |
+| 1 | Session caching (feather) | 5-30s/req | 2-3h | 5-30s/req |
+| 1 | Resampling (verify sort) | 5-10% | 1-2h | 47-68% |
+| **Phase 1 Total** | | | **8-12h** | **~50-70%** |
+| 2 | Frame serialization | 20-30% WS | 1h | WS only |
+| 2 | Multiprocessing | 10-20% | 1h | 52-72% |
+| 2 | WebSocket compression | 30-40% BW | 2-3h | 30-40% BW |
+
+**Recommendation:** Implement Phase 1 completely with golden file validation before moving to Phase 2.
+The 8-12 hours of work should yield 50-70% improvement in telemetry processing speed with effectively zero risk to data integrity if golden files pass validation.
