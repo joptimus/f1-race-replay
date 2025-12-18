@@ -77,7 +77,7 @@ function calculateSectorCentroid(
   };
 }
 
-export const TrackVisualization3D: React.FC<{ onSessionTypeChange?: (year: number, round: number, sessionType: string) => void }> = ({ onSessionTypeChange }) => {
+export const TrackVisualization3D: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -99,8 +99,7 @@ export const TrackVisualization3D: React.FC<{ onSessionTypeChange?: (year: numbe
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [showWeatherPanel, setShowWeatherPanel] = useState(true);
   const [temperatureUnit, setTemperatureUnit] = useState<'C' | 'F'>('C');
-  const [currentSessionType, setCurrentSessionType] = useState<'R' | 'S' | 'Q' | 'FP1' | 'FP2' | 'FP3'>('R');
-  const [enableWeatherFx, setEnableWeatherFx] = useState(true); // 🔄 toggle for rain / weather FX
+  const [enableWeatherFx, setEnableWeatherFx] = useState(true);
 
   // Setup scene and track (only once)
   useEffect(() => {
@@ -903,71 +902,6 @@ try {
         overflow: "hidden",
       }}
     >
-      {/* Session Toggle Buttons at Top-Center */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '16px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 24,
-          display: 'flex',
-          gap: '8px',
-          backgroundColor: 'rgba(15, 15, 18, 0.85)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '8px',
-          padding: '8px',
-          backdropFilter: 'blur(8px)',
-        }}
-      >
-        {[
-          { label: 'FP1', value: 'FP1' as const },
-          { label: 'FP2', value: 'FP2' as const },
-          { label: 'FP3', value: 'FP3' as const },
-          { label: 'QUALI', value: 'Q' as const },
-          { label: 'GRAND PRIX', value: 'R' as const },
-          { label: 'SPRINT', value: 'S' as const },
-        ].map(({ label, value }) => (
-          <button
-            key={value}
-            onClick={() => {
-              setCurrentSessionType(value);
-              if (onSessionTypeChange && sessionMetadata?.year && sessionMetadata?.round) {
-                onSessionTypeChange(sessionMetadata.year, sessionMetadata.round, value);
-              }
-            }}
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              border: currentSessionType === value ? '2px solid #e10600' : '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '4px',
-              background: currentSessionType === value ? 'rgba(225, 6, 0, 0.2)' : 'transparent',
-              color: currentSessionType === value ? '#e10600' : '#9ca3af',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              fontFamily: 'monospace',
-              letterSpacing: '0.05em',
-              whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={(e) => {
-              if (currentSessionType !== value) {
-                (e.currentTarget as any).borderColor = 'rgba(255, 255, 255, 0.4)';
-                (e.currentTarget as any).color = '#d1d5db';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (currentSessionType !== value) {
-                (e.currentTarget as any).borderColor = 'rgba(255, 255, 255, 0.2)';
-                (e.currentTarget as any).color = '#9ca3af';
-              }
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {/* Settings Button at Top-Right */}
       <button
         onClick={() => setShowSettingsPanel(true)}

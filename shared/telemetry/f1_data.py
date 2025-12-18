@@ -217,7 +217,7 @@ def get_circuit_rotation(session):
 def get_race_telemetry(session, session_type='R', refresh=False):
 
     event_name = str(session).replace(' ', '_')
-    cache_suffix = 'sprint' if session_type == 'S' else 'race'
+    cache_suffix = session_type.lower()
 
     # Check if this data has already been computed
 

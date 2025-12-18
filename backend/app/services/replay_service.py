@@ -51,7 +51,7 @@ class F1ReplaySession:
                 self.driver_colors = data.get("driver_colors", {})
                 self.track_statuses = data.get("track_statuses", [])
                 self.total_laps = data.get("total_laps", 0)
-                self.race_start_time = data.get("race_start_time")
+                self.race_start_time = data.get("race_start_time", None)
 
             self.driver_numbers = self._extract_driver_numbers(session)
             self.driver_teams = self._extract_driver_teams(session)
