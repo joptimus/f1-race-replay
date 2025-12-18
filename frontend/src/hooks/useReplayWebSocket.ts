@@ -18,7 +18,21 @@ export const useReplayWebSocket = (sessionId: string | null) => {
   const wsRef = useRef<WebSocket | null>(null);
   const { currentFrame, setCurrentFrame, playback, setFrameIndex } = useReplayStore();
   const lastSentCommandRef = useRef<WebSocketMessage | null>(null);
-  const sendCommandRef = useRef<((message: WebSocketMessage) => void) | null>(null);
+
+  // Send control commands to server
+  const sendCommand = useCallback((message: WebSocketMessage) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      // Debounce identical commands within 100ms
+      const isIdentical =
+        lastSentCommandRef.current &&
+        JSON.stringify(lastSentCommandRef.current) === JSON.stringify(message);
+
+      if (!isIdentical) {
+        wsRef.current.send(JSON.stringify(message));
+        lastSentCommandRef.current = message;
+      }
+    }
+  }, []);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -40,9 +54,7 @@ export const useReplayWebSocket = (sessionId: string | null) => {
     wsRef.current.onopen = () => {
       console.log("WebSocket connected");
       // Request initial frame when connection opens
-      if (sendCommandRef.current) {
-        sendCommandRef.current({ action: "seek", frame: 0 });
-      }
+      sendCommand({ action: "seek", frame: 0 });
     };
 
     wsRef.current.onmessage = async (event) => {
@@ -85,27 +97,7 @@ export const useReplayWebSocket = (sessionId: string | null) => {
         wsRef.current.close();
       }
     };
-  }, [sessionId]);
-
-  // Send control commands to server
-  const sendCommand = useCallback((message: WebSocketMessage) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      // Debounce identical commands within 100ms
-      const isIdentical =
-        lastSentCommandRef.current &&
-        JSON.stringify(lastSentCommandRef.current) === JSON.stringify(message);
-
-      if (!isIdentical) {
-        wsRef.current.send(JSON.stringify(message));
-        lastSentCommandRef.current = message;
-      }
-    }
-  }, []);
-
-  // Update sendCommandRef so onopen handler can call it
-  useEffect(() => {
-    sendCommandRef.current = sendCommand;
-  }, [sendCommand]);
+  }, [sendCommand, sessionId]);
 
   // Sync playback state to WebSocket
   useEffect(() => {
