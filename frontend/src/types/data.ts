@@ -1,6 +1,7 @@
 export interface Driver {
   First: string;
   Last: string;
+  Code: string;
   Country: string;
   Team: string;
   CarNumber: string;

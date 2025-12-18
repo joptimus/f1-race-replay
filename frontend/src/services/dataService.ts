@@ -17,11 +17,7 @@ export const dataService = {
     const codeLower = code.toLowerCase();
 
     const driver = drivers.find(d => {
-      const firstInitial = d.First.charAt(0).toLowerCase();
-      const lastNameFirst3 = d.Last.substring(0, 3).toLowerCase();
-      const driverCode = (firstInitial + lastNameFirst3);
-
-      return driverCode === codeLower || d.CarNumber === code;
+      return d.Code.toLowerCase() === codeLower || d.CarNumber === code;
     });
 
     return driver || null;
