@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 import sys
 from pathlib import Path
 import msgpack
@@ -62,6 +62,15 @@ async def handle_replay_websocket(websocket: WebSocket, session_id: str, active_
                     print(f"[WS] Seek command: frame={frame_index}")
             except asyncio.TimeoutError:
                 pass
+            except WebSocketDisconnect:
+                print(f"[WS] Client disconnected for session {session_id}")
+                break
+            except RuntimeError as cmd_error:
+                if "disconnect" in str(cmd_error).lower():
+                    print(f"[WS] Client disconnected (RuntimeError): {cmd_error}")
+                    break
+                print(f"[WS] Error receiving command: {cmd_error}")
+                continue
             except Exception as cmd_error:
                 print(f"[WS] Error receiving command: {cmd_error}")
                 continue
@@ -81,6 +90,9 @@ async def handle_replay_websocket(websocket: WebSocket, session_id: str, active_
                     frame_index = len(session.frames) - 1
 
                 await asyncio.sleep(1 / 60)
+            except WebSocketDisconnect:
+                print(f"[WS] Client disconnected while sending frames")
+                break
             except Exception as send_error:
                 print(f"[WS] Error sending frame: {send_error}")
                 break
