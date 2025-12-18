@@ -12,6 +12,7 @@ import { SidebarMenu } from "./components/SidebarMenu";
 import { SessionModal } from "./components/SessionModal";
 import { LoadingModal } from "./components/LoadingModal";
 import { motion } from "framer-motion";
+import { dataService } from "./services/dataService";
 
 const DRIVER_NUMBERS: Record<string, string> = {
   "HAM": "44", "VER": "1", "NOR": "4", "PIA": "81", "LEC": "16",
@@ -22,7 +23,7 @@ const DRIVER_NUMBERS: Record<string, string> = {
   "DOO": "7", "OCA": "81"
 };
 
-const DriverHero = () => {
+const DriverHero = ({ year }: { year?: number }) => {
   const selected = useSelectedDriver();
 
   if (!selected) return (
@@ -37,6 +38,7 @@ const DriverHero = () => {
   // Calculate accessible color (darker version)
   const accessibleColor = `rgb(${Math.max(0, color[0] - 80)}, ${Math.max(0, color[1] - 80)}, ${Math.max(0, color[2] - 80)})`;
   const driverNum = DRIVER_NUMBERS[code] || "0";
+  const fullName = year ? dataService.getDriverFullName(year, code) : code;
 
   return (
     <motion.div
@@ -57,8 +59,8 @@ const DriverHero = () => {
 
       {/* 2. TEXT CONTENT (Z-INDEX 10) */}
       <div className="f1-card-info">
-        <p className="f1-first-name">{code}</p>
-        <p className="f1-last-name">{code}</p>
+        <p className="f1-first-name">{fullName.split(' ')[0] || code}</p>
+        <p className="f1-last-name">{fullName.split(' ')[1] || code}</p>
         <div className="f1-team-name">{code}</div>
 
         {/* Number Image */}
@@ -174,7 +176,9 @@ function App() {
   const weather = currentFrame?.weather;
   const year = session.metadata?.year;
   const round = session.metadata?.round;
-  const raceName = year && round ? `${year} F1 ROUND ${round}` : 'F1 RACE REPLAY';
+  const raceName = year && round
+    ? `${year} ${dataService.getRaceName(year, round).toUpperCase()}`
+    : 'F1 RACE REPLAY';
 
   return (
     <div className="app-container">
@@ -233,7 +237,7 @@ function App() {
       </main>
 
       <aside className="flex flex-col overflow-hidden h-full">
-        <DriverHero />
+        <DriverHero year={year} />
         <div className="sidebar-scroll" style={{ background: 'var(--f1-black)', padding: '16px', borderRadius: '8px', border: '1px solid var(--f1-border)', flex: 1 }}>
           <TelemetryChart />
         </div>

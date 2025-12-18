@@ -19,7 +19,8 @@
       "Bash(timeout 3 powershell:*)",
       "Bash(python3:*)",
       "Bash(npx tsc:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git add:*)"
     ]
   }
 }

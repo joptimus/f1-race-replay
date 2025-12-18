@@ -1,0 +1,578 @@
+{
+  "2018": [
+    {
+      "slug": "mercedes",
+      "name": "Mercedes AMG Petronas Motorsport",
+      "primaryColorHex": "#00D2BE",
+      "seasonBrandColorsHex": ["#00D2BE", "#000000", "#C8CCCE", "#FFFFFF"],
+      "notes": "F1 broadcast color; black/silver/white from wider Mercedes brand palette."
+    },
+    {
+      "slug": "ferrari",
+      "name": "Scuderia Ferrari",
+      "primaryColorHex": "#DC0000",
+      "seasonBrandColorsHex": ["#DC0000", "#FFFFFF", "#000000"],
+      "notes": "Classic Ferrari red as used in F1 TV graphics."
+    },
+    {
+      "slug": "red_bull",
+      "name": "Aston Martin Red Bull Racing",
+      "primaryColorHex": "#00327D",
+      "seasonBrandColorsHex": ["#00327D", "#EC1845", "#FED502", "#FFFFFF"],
+      "notes": "Navy scoreboard color plus typical Red Bull red/yellow/white brand tones."
+    },
+    {
+      "slug": "force_india",
+      "name": "Sahara Force India F1 Team / Racing Point Force India",
+      "primaryColorHex": "#F596C8",
+      "seasonBrandColorsHex": ["#F596C8", "#EC0374", "#F363B9", "#005CAA", "#011E3A"],
+      "notes": "Pink used in graphics; blue/gray/other pink tones from Racing Point palette."
+    },
+    {
+      "slug": "williams",
+      "name": "Williams Martini Racing",
+      "primaryColorHex": "#0082FA",
+      "seasonBrandColorsHex": ["#0082FA", "#FFFFFF", "#FF0000", "#00AEEF"],
+      "notes": "Blue from F1 graphics; rest approximated from Martini-era branding."
+    },
+    {
+      "slug": "renault",
+      "name": "Renault Sport Formula One Team",
+      "primaryColorHex": "#FFF500",
+      "seasonBrandColorsHex": ["#FFF500", "#000000"],
+      "notes": "Bright yellow/black Renault F1 identity."
+    },
+    {
+      "slug": "toro_rosso",
+      "name": "Red Bull Toro Rosso Honda",
+      "primaryColorHex": "#469BFF",
+      "seasonBrandColorsHex": ["#469BFF", "#00205B", "#DE3126"],
+      "notes": "Blue from TV graphics; dark blue/red from Toro Rosso brand colors."
+    },
+    {
+      "slug": "haas",
+      "name": "Haas F1 Team",
+      "primaryColorHex": "#B6BABD",
+      "seasonBrandColorsHex": ["#B6BABD", "#FFFFFF", "#ED1A3B"],
+      "notes": "Light grey scoreboard color; red/white from Haas corporate palette."
+    },
+    {
+      "slug": "mclaren",
+      "name": "McLaren F1 Team",
+      "primaryColorHex": "#FF8700",
+      "seasonBrandColorsHex": ["#FF8700", "#0090FF", "#000000"],
+      "notes": "Papaya orange plus common blue/black accents."
+    },
+    {
+      "slug": "sauber",
+      "name": "Alfa Romeo Sauber F1 Team",
+      "primaryColorHex": "#9B0000",
+      "seasonBrandColorsHex": ["#9B0000", "#FFFFFF"],
+      "notes": "Dark red used for Sauber/Alfa hybrid branding."
+    }
+  ],
+  "2019": [
+    {
+      "slug": "mercedes",
+      "name": "Mercedes AMG Petronas Motorsport",
+      "primaryColorHex": "#00D2BE",
+      "seasonBrandColorsHex": ["#00D2BE", "#000000", "#C8CCCE", "#FFFFFF"],
+      "notes": "Same teal scorecard color as 2018/2020."
+    },
+    {
+      "slug": "ferrari",
+      "name": "Scuderia Ferrari",
+      "primaryColorHex": "#DC0000",
+      "seasonBrandColorsHex": ["#DC0000", "#FFFFFF", "#000000"],
+      "notes": "F1 2019 scoreboard red (very similar to 2018)."
+    },
+    {
+      "slug": "red_bull",
+      "name": "Aston Martin Red Bull Racing",
+      "primaryColorHex": "#1E41FF",
+      "seasonBrandColorsHex": ["#1E41FF", "#EC1845", "#FED502", "#FFFFFF"],
+      "notes": "2019 broadcast blue (approx.; very close to later #1E5BC6 used in EA thread)."
+    },
+    {
+      "slug": "renault",
+      "name": "Renault F1 Team",
+      "primaryColorHex": "#FFF500",
+      "seasonBrandColorsHex": ["#FFF500", "#000000"],
+      "notes": "Yellow/black Renault identity continues."
+    },
+    {
+      "slug": "haas",
+      "name": "Haas F1 Team",
+      "primaryColorHex": "#F0D787",
+      "seasonBrandColorsHex": ["#F0D787", "#000000", "#FFFFFF"],
+      "notes": "Gold-toned broadcast color during the Rich Energy livery year (approx)."
+    },
+    {
+      "slug": "racing_point",
+      "name": "SportPesa Racing Point F1 Team",
+      "primaryColorHex": "#F596C8",
+      "seasonBrandColorsHex": ["#F596C8", "#EC0374", "#F363B9", "#005CAA", "#011E3A"],
+      "notes": "Pink inherited from Force India; multi-color palette from Racing Point brand."
+    },
+    {
+      "slug": "toro_rosso",
+      "name": "Red Bull Toro Rosso Honda",
+      "primaryColorHex": "#469BFF",
+      "seasonBrandColorsHex": ["#469BFF", "#00205B", "#DE3126"],
+      "notes": "Toro Rosso blue stays consistent with 2018."
+    },
+    {
+      "slug": "mclaren",
+      "name": "McLaren F1 Team",
+      "primaryColorHex": "#FF8700",
+      "seasonBrandColorsHex": ["#FF8700", "#0090FF", "#000000"],
+      "notes": "Papaya orange with blue accents."
+    },
+    {
+      "slug": "alfa_romeo",
+      "name": "Alfa Romeo Racing",
+      "primaryColorHex": "#9B0000",
+      "seasonBrandColorsHex": ["#9B0000", "#FFFFFF"],
+      "notes": "Sauber officially becomes Alfa Romeo Racing; dark red retained."
+    },
+    {
+      "slug": "williams",
+      "name": "ROKiT Williams Racing",
+      "primaryColorHex": "#0082FA",
+      "seasonBrandColorsHex": ["#0082FA", "#FFFFFF", "#FF0000"],
+      "notes": "Blue/white/red ROKiT era; primary blue similar to 2018/2020."
+    }
+  ],
+  "2020": [
+    {
+      "slug": "mercedes",
+      "name": "Mercedes AMG Petronas F1 Team",
+      "primaryColorHex": "#00D2BE",
+      "seasonBrandColorsHex": ["#00D2BE", "#000000", "#C8CCCE", "#FFFFFF"],
+      "notes": "Official F1 2020 team color."
+    },
+    {
+      "slug": "ferrari",
+      "name": "Scuderia Ferrari",
+      "primaryColorHex": "#C00000",
+      "seasonBrandColorsHex": ["#C00000", "#FFFFFF", "#000000"],
+      "notes": "Slightly darker F1 2020 broadcast red."
+    },
+    {
+      "slug": "red_bull",
+      "name": "Aston Martin Red Bull Racing",
+      "primaryColorHex": "#0600EF",
+      "seasonBrandColorsHex": ["#0600EF", "#EC1845", "#FED502", "#FFFFFF"],
+      "notes": "Deep blue TV graphics color."
+    },
+    {
+      "slug": "renault",
+      "name": "Renault F1 Team",
+      "primaryColorHex": "#FFF500",
+      "seasonBrandColorsHex": ["#FFF500", "#000000"],
+      "notes": "Yellow/black through final Renault season before Alpine rebrand."
+    },
+    {
+      "slug": "haas",
+      "name": "Haas F1 Team",
+      "primaryColorHex": "#787878",
+      "seasonBrandColorsHex": ["#787878", "#FFFFFF", "#ED1A3B"],
+      "notes": "Neutral grey used in 2020 graphics."
+    },
+    {
+      "slug": "racing_point",
+      "name": "BWT Racing Point F1 Team",
+      "primaryColorHex": "#F596C8",
+      "seasonBrandColorsHex": ["#F596C8", "#EC0374", "#F363B9", "#005CAA", "#011E3A"],
+      "notes": "Pink BWT identity at its peak pre-Aston."
+    },
+    {
+      "slug": "alpha_tauri",
+      "name": "Scuderia AlphaTauri Honda",
+      "primaryColorHex": "#C8C8C8",
+      "seasonBrandColorsHex": ["#C8C8C8", "#001F3F", "#FFFFFF"],
+      "notes": "Silver/white/blue palette; grey used as team color in graphics."
+    },
+    {
+      "slug": "mclaren",
+      "name": "McLaren F1 Team",
+      "primaryColorHex": "#FF8700",
+      "seasonBrandColorsHex": ["#FF8700", "#0090FF", "#000000"],
+      "notes": "Continuing papaya orange."
+    },
+    {
+      "slug": "alfa_romeo",
+      "name": "Alfa Romeo Racing",
+      "primaryColorHex": "#960000",
+      "seasonBrandColorsHex": ["#960000", "#FFFFFF"],
+      "notes": "Dark maroon variant in 2020."
+    },
+    {
+      "slug": "williams",
+      "name": "Williams Racing",
+      "primaryColorHex": "#0082FA",
+      "seasonBrandColorsHex": ["#0082FA", "#FFFFFF"],
+      "notes": "Blue slightly tweaked vs earlier years."
+    }
+  ],
+  "2021": [
+    {
+      "slug": "mercedes",
+      "name": "Mercedes AMG Petronas F1 Team",
+      "primaryColorHex": "#00D2BE",
+      "seasonBrandColorsHex": ["#00D2BE", "#000000", "#C8CCCE", "#FFFFFF"],
+      "notes": "Same teal broadcast color as 2020."
+    },
+    {
+      "slug": "ferrari",
+      "name": "Scuderia Ferrari",
+      "primaryColorHex": "#DC0000",
+      "seasonBrandColorsHex": ["#DC0000", "#FFFFFF", "#000000"],
+      "notes": "Standard Ferrari red in 2021 TV graphics."
+    },
+    {
+      "slug": "red_bull",
+      "name": "Red Bull Racing Honda",
+      "primaryColorHex": "#0600EF",
+      "seasonBrandColorsHex": ["#0600EF", "#EC1845", "#FED502", "#FFFFFF"],
+      "notes": "Carries over deep blue from 2020 list."
+    },
+    {
+      "slug": "alpine",
+      "name": "Alpine F1 Team",
+      "primaryColorHex": "#0090FF",
+      "seasonBrandColorsHex": ["#0090FF", "#000000", "#FFFFFF", "#FE86BC"],
+      "notes": "Renault becomes Alpine; bright blue plus pink BWT arriving later."
+    },
+    {
+      "slug": "haas",
+      "name": "Uralkali Haas F1 Team",
+      "primaryColorHex": "#FFFFFF",
+      "seasonBrandColorsHex": ["#FFFFFF", "#ED1A3B", "#0000FF"],
+      "notes": "White graphics color; Russian-flag styled livery."
+    },
+    {
+      "slug": "aston_martin",
+      "name": "Aston Martin Cognizant F1 Team",
+      "primaryColorHex": "#006F62",
+      "seasonBrandColorsHex": ["#006F62", "#FFFFFF"],
+      "notes": "British racing green returns replacing Racing Point pink."
+    },
+    {
+      "slug": "alpha_tauri",
+      "name": "Scuderia AlphaTauri Honda",
+      "primaryColorHex": "#2B4562",
+      "seasonBrandColorsHex": ["#2B4562", "#FFFFFF"],
+      "notes": "Dark blue/white AlphaTauri identity."
+    },
+    {
+      "slug": "mclaren",
+      "name": "McLaren F1 Team",
+      "primaryColorHex": "#FF8700",
+      "seasonBrandColorsHex": ["#FF8700", "#0090FF", "#000000"],
+      "notes": "Papaya orange still primary."
+    },
+    {
+      "slug": "alfa_romeo",
+      "name": "Alfa Romeo Racing ORLEN",
+      "primaryColorHex": "#900000",
+      "seasonBrandColorsHex": ["#900000", "#FFFFFF"],
+      "notes": "Deep maroon variant used in 2021 tables."
+    },
+    {
+      "slug": "williams",
+      "name": "Williams Racing",
+      "primaryColorHex": "#005AFF",
+      "seasonBrandColorsHex": ["#005AFF", "#FFFFFF"],
+      "notes": "Bright blue for the refreshed Williams identity."
+    }
+  ],
+  "2022": [
+    {
+      "slug": "mercedes",
+      "name": "Mercedes AMG Petronas F1 Team",
+      "primaryColorHex": "#6CD3BF",
+      "seasonBrandColorsHex": ["#6CD3BF", "#000000", "#C8CCCE", "#FFFFFF"],
+      "notes": "2022 broadcast teal tone approximated from 2023 list."
+    },
+    {
+      "slug": "red_bull",
+      "name": "Oracle Red Bull Racing",
+      "primaryColorHex": "#3671C6",
+      "seasonBrandColorsHex": ["#3671C6", "#EC1845", "#FED502", "#FFFFFF"],
+      "notes": "Blue taken from 2023 list; 2022 was visually very similar."
+    },
+    {
+      "slug": "ferrari",
+      "name": "Scuderia Ferrari",
+      "primaryColorHex": "#F91536",
+      "seasonBrandColorsHex": ["#F91536", "#FFFFFF", "#000000"],
+      "notes": "Bright Ferrari red used around the F1-75 era (borrowed from 2023 palette)."
+    },
+    {
+      "slug": "mclaren",
+      "name": "McLaren F1 Team",
+      "primaryColorHex": "#F58020",
+      "seasonBrandColorsHex": ["#F58020", "#0090FF", "#000000"],
+      "notes": "Papaya slightly adjusted; close to 2023 graphics color."
+    },
+    {
+      "slug": "alpine",
+      "name": "BWT Alpine F1 Team",
+      "primaryColorHex": "#2293D1",
+      "seasonBrandColorsHex": ["#2293D1", "#FE86BC", "#FFFFFF"],
+      "notes": "Blue/pink Alpine-BWT combo, approximated via 2023 values."
+    },
+    {
+      "slug": "alpha_tauri",
+      "name": "Scuderia AlphaTauri",
+      "primaryColorHex": "#5E8FAA",
+      "seasonBrandColorsHex": ["#5E8FAA", "#FFFFFF"],
+      "notes": "Blue/white styling; tone based on 2023 F1 list."
+    },
+    {
+      "slug": "aston_martin",
+      "name": "Aston Martin Aramco Cognizant F1 Team",
+      "primaryColorHex": "#358C75",
+      "seasonBrandColorsHex": ["#358C75", "#FFFFFF"],
+      "notes": "Green approximated from 2023 broadcast codes."
+    },
+    {
+      "slug": "williams",
+      "name": "Williams Racing",
+      "primaryColorHex": "#37BEDD",
+      "seasonBrandColorsHex": ["#37BEDD", "#FFFFFF"],
+      "notes": "Cyan-leaning blue tone similar to 2023 listing."
+    },
+    {
+      "slug": "alfa_romeo",
+      "name": "Alfa Romeo F1 Team ORLEN",
+      "primaryColorHex": "#C92D4B",
+      "seasonBrandColorsHex": ["#C92D4B", "#FFFFFF", "#000000"],
+      "notes": "Red from 2023 broadcast palette; 2022 car visually very close."
+    },
+    {
+      "slug": "haas",
+      "name": "Haas F1 Team",
+      "primaryColorHex": "#B6BABD",
+      "seasonBrandColorsHex": ["#B6BABD", "#FFFFFF", "#000000"],
+      "notes": "Light grey Haas color; carried on into 2023."
+    }
+  ],
+  "2023": [
+    {
+      "slug": "mercedes",
+      "name": "Mercedes AMG Petronas F1 Team",
+      "primaryColorHex": "#6CD3BF",
+      "seasonBrandColorsHex": ["#6CD3BF", "#000000", "#C8CCCE", "#FFFFFF"],
+      "notes": "2023 teal from official F1 list."
+    },
+    {
+      "slug": "red_bull",
+      "name": "Oracle Red Bull Racing",
+      "primaryColorHex": "#3671C6",
+      "seasonBrandColorsHex": ["#3671C6", "#EC1845", "#FED502", "#FFFFFF"],
+      "notes": "2023 F1 broadcast blue."
+    },
+    {
+      "slug": "ferrari",
+      "name": "Scuderia Ferrari",
+      "primaryColorHex": "#F91536",
+      "seasonBrandColorsHex": ["#F91536", "#FFFFFF", "#000000"],
+      "notes": "Brighter Ferrari red used that season."
+    },
+    {
+      "slug": "mclaren",
+      "name": "McLaren F1 Team",
+      "primaryColorHex": "#F58020",
+      "seasonBrandColorsHex": ["#F58020", "#0090FF", "#000000"],
+      "notes": "Papaya with slightly updated tone."
+    },
+    {
+      "slug": "alpine",
+      "name": "BWT Alpine F1 Team",
+      "primaryColorHex": "#2293D1",
+      "seasonBrandColorsHex": ["#2293D1", "#FE86BC", "#FFFFFF"],
+      "notes": "Official 2023 Alpine blue; pink used for some liveries."
+    },
+    {
+      "slug": "alpha_tauri",
+      "name": "Scuderia AlphaTauri",
+      "primaryColorHex": "#5E8FAA",
+      "seasonBrandColorsHex": ["#5E8FAA", "#FFFFFF"],
+      "notes": "2023 AlphaTauri broadcast color."
+    },
+    {
+      "slug": "aston_martin",
+      "name": "Aston Martin Aramco Cognizant F1 Team",
+      "primaryColorHex": "#358C75",
+      "seasonBrandColorsHex": ["#358C75", "#FFFFFF"],
+      "notes": "Aston Martin green in 2023 tables."
+    },
+    {
+      "slug": "williams",
+      "name": "Williams Racing",
+      "primaryColorHex": "#37BEDD",
+      "seasonBrandColorsHex": ["#37BEDD", "#FFFFFF"],
+      "notes": "Cyan-ish Williams color from F1 site."
+    },
+    {
+      "slug": "alfa_romeo",
+      "name": "Alfa Romeo F1 Team Stake",
+      "primaryColorHex": "#C92D4B",
+      "seasonBrandColorsHex": ["#C92D4B", "#FFFFFF", "#000000"],
+      "notes": "Alfa Romeo’s final-season red in F1 broadcast graphics."
+    },
+    {
+      "slug": "haas",
+      "name": "MoneyGram Haas F1 Team",
+      "primaryColorHex": "#B6BABD",
+      "seasonBrandColorsHex": ["#B6BABD", "#FFFFFF", "#000000"],
+      "notes": "Same light grey as previous season’s listing."
+    }
+  ],
+  "2024": [
+    {
+      "slug": "mercedes",
+      "name": "Mercedes AMG Petronas F1 Team",
+      "primaryColorHex": "#27F4D2",
+      "seasonBrandColorsHex": ["#27F4D2", "#000000", "#C8CCCE", "#FFFFFF"],
+      "notes": "Updated bright teal from 2024 F1 list."
+    },
+    {
+      "slug": "red_bull",
+      "name": "Oracle Red Bull Racing",
+      "primaryColorHex": "#3671C6",
+      "seasonBrandColorsHex": ["#3671C6", "#EC1845", "#FED502", "#FFFFFF"],
+      "notes": "Same blue as 2023 in F1 2024 list."
+    },
+    {
+      "slug": "ferrari",
+      "name": "Scuderia Ferrari HP",
+      "primaryColorHex": "#E8002D",
+      "seasonBrandColorsHex": ["#E8002D", "#FFFFFF", "#000000"],
+      "notes": "Slightly tweaked Ferrari red from 2024 table."
+    },
+    {
+      "slug": "mclaren",
+      "name": "McLaren F1 Team",
+      "primaryColorHex": "#FF8000",
+      "seasonBrandColorsHex": ["#FF8000", "#0090FF", "#000000"],
+      "notes": "2024 papaya tone."
+    },
+    {
+      "slug": "alpine",
+      "name": "BWT Alpine F1 Team",
+      "primaryColorHex": "#FF87BC",
+      "seasonBrandColorsHex": ["#FF87BC", "#2293D1", "#FFFFFF"],
+      "notes": "Pink-leaning broadcast color in 2024 list."
+    },
+    {
+      "slug": "rb",
+      "name": "Visa Cash App RB F1 Team",
+      "primaryColorHex": "#6692FF",
+      "seasonBrandColorsHex": ["#6692FF", "#FFFFFF", "#000000"],
+      "notes": "RB (rebranded AlphaTauri) blue."
+    },
+    {
+      "slug": "aston_martin",
+      "name": "Aston Martin Aramco F1 Team",
+      "primaryColorHex": "#229971",
+      "seasonBrandColorsHex": ["#229971", "#FFFFFF"],
+      "notes": "Aston green matching official 2024 F1 list."
+    },
+    {
+      "slug": "williams",
+      "name": "Williams Racing",
+      "primaryColorHex": "#64C4FF",
+      "seasonBrandColorsHex": ["#64C4FF", "#FFFFFF"],
+      "notes": "Light blue Williams team color in 2024 graphics."
+    },
+    {
+      "slug": "kick_sauber",
+      "name": "Stake F1 Team Kick Sauber",
+      "primaryColorHex": "#52E252",
+      "seasonBrandColorsHex": ["#52E252", "#000000", "#FFFFFF"],
+      "notes": "Bright green Stake/Kick Sauber color."
+    },
+    {
+      "slug": "haas",
+      "name": "MoneyGram Haas F1 Team",
+      "primaryColorHex": "#B6BABD",
+      "seasonBrandColorsHex": ["#B6BABD", "#FFFFFF", "#000000"],
+      "notes": "Grey Haas entry in 2024 list."
+    }
+  ],
+  "2025": [
+    {
+      "slug": "mercedes",
+      "name": "Mercedes AMG Petronas F1 Team",
+      "primaryColorHex": "#00D7B6",
+      "seasonBrandColorsHex": ["#00D7B6", "#000000", "#C8CCCE", "#FFFFFF"],
+      "notes": "2025 teal from Formula1.com."
+    },
+    {
+      "slug": "red_bull",
+      "name": "Oracle Red Bull Racing",
+      "primaryColorHex": "#4781D7",
+      "seasonBrandColorsHex": ["#4781D7", "#EC1845", "#FED502", "#FFFFFF"],
+      "notes": "Slightly adjusted blue compared to 2024."
+    },
+    {
+      "slug": "ferrari",
+      "name": "Scuderia Ferrari HP",
+      "primaryColorHex": "#ED1131",
+      "seasonBrandColorsHex": ["#ED1131", "#FFFFFF", "#000000"],
+      "notes": "Darker Ferrari red for 2025 broadcast graphics."
+    },
+    {
+      "slug": "mclaren",
+      "name": "McLaren F1 Team",
+      "primaryColorHex": "#F47600",
+      "seasonBrandColorsHex": ["#F47600", "#0090FF", "#000000"],
+      "notes": "Updated papaya from the 2025 table."
+    },
+    {
+      "slug": "alpine",
+      "name": "BWT Alpine F1 Team",
+      "primaryColorHex": "#00A1E8",
+      "seasonBrandColorsHex": ["#00A1E8", "#FE86BC", "#FFFFFF"],
+      "notes": "Blue returns as the main broadcast color, with pink still in the livery."
+    },
+    {
+      "slug": "racing_bulls",
+      "name": "Visa Cash App Racing Bulls F1 Team",
+      "primaryColorHex": "#6C98FF",
+      "seasonBrandColorsHex": ["#6C98FF", "#FFFFFF", "#000000"],
+      "notes": "RB renamed to Racing Bulls; blue tone carried over from 2024 RB entry."
+    },
+    {
+      "slug": "aston_martin",
+      "name": "Aston Martin Aramco F1 Team",
+      "primaryColorHex": "#229971",
+      "seasonBrandColorsHex": ["#229971", "#FFFFFF"],
+      "notes": "Same team green as 2024."
+    },
+    {
+      "slug": "williams",
+      "name": "Williams Racing",
+      "primaryColorHex": "#1868DB",
+      "seasonBrandColorsHex": ["#1868DB", "#FFFFFF"],
+      "notes": "Williams blue updated mid-2024 and carried into 2025."
+    },
+    {
+      "slug": "kick_sauber",
+      "name": "Stake F1 Team Kick Sauber",
+      "primaryColorHex": "#01C00E",
+      "seasonBrandColorsHex": ["#01C00E", "#000000", "#FFFFFF"],
+      "notes": "Slightly different bright green for 2025 list."
+    },
+    {
+      "slug": "haas",
+      "name": "MoneyGram Haas F1 Team",
+      "primaryColorHex": "#9C9FA2",
+      "seasonBrandColorsHex": ["#9C9FA2", "#FFFFFF", "#000000"],
+      "notes": "Darker grey Haas entry in 2025 broadcast palette."
+    }
+  ]
+}
