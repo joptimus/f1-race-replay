@@ -2,20 +2,51 @@
  * Loading modal shown while session data is being fetched
  */
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface LoadingModalProps {
   isOpen: boolean;
   year?: number;
   round?: number;
+  isFullyLoaded?: boolean;
 }
 
 export const LoadingModal: React.FC<LoadingModalProps> = ({
   isOpen,
   year = 2025,
   round = 1,
+  isFullyLoaded = false,
 }) => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setProgress(0);
+      return;
+    }
+
+    // Simulate progress from 0 to 90% during loading
+    // The actual data load completion will set it to 100%
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        // Increase progress but slow down as we approach 90%
+        if (prev >= 90) return 90;
+        const increment = Math.max(1, (90 - prev) * 0.05);
+        return Math.min(90, prev + increment);
+      });
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [isOpen]);
+
+  // Jump to 100% when fully loaded
+  useEffect(() => {
+    if (isFullyLoaded) {
+      setProgress(100);
+    }
+  }, [isFullyLoaded]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -53,6 +84,7 @@ export const LoadingModal: React.FC<LoadingModalProps> = ({
               padding: "48px 64px",
               textAlign: "center",
               boxShadow: "0 20px 60px rgba(0, 0, 0, 0.8)",
+              minWidth: "400px",
             }}
           >
             <h2
@@ -111,6 +143,40 @@ export const LoadingModal: React.FC<LoadingModalProps> = ({
                   }}
                 />
               ))}
+            </div>
+
+            {/* Progress Bar */}
+            <div style={{ marginBottom: "16px" }}>
+              <div
+                style={{
+                  width: "100%",
+                  height: "8px",
+                  backgroundColor: "#374151",
+                  borderRadius: "4px",
+                  overflow: "hidden",
+                  marginBottom: "8px",
+                }}
+              >
+                <motion.div
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  style={{
+                    height: "100%",
+                    background: "linear-gradient(to right, #e10600, #ff4444)",
+                    borderRadius: "4px",
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  fontSize: "0.875rem",
+                  color: "#9ca3af",
+                  fontFamily: "monospace",
+                  fontWeight: 600,
+                }}
+              >
+                {Math.round(progress)}%
+              </div>
             </div>
 
             <div

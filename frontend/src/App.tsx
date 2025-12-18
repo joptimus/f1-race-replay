@@ -258,6 +258,7 @@ function App() {
         isOpen={session.isLoading}
         year={loadingSessionYear || year}
         round={loadingSessionRound || round}
+        isFullyLoaded={!!session.metadata?.total_frames && !session.isLoading}
       />
     </div>
   );
