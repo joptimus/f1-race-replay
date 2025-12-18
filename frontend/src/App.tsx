@@ -254,6 +254,16 @@ function AppRoutes() {
   const navigate = useNavigate();
   const { session, setSession, setSessionLoading, pause } = useReplayStore();
 
+  useEffect(() => {
+    const handleSessionTypeChangeEvent = (event: any) => {
+      const { sessionType, year, round } = event.detail;
+      handleSessionTypeChange(year, round, sessionType);
+    };
+
+    window.addEventListener('sessionTypeChange', handleSessionTypeChangeEvent);
+    return () => window.removeEventListener('sessionTypeChange', handleSessionTypeChangeEvent);
+  }, []);
+
   const pollSessionStatus = async (sessionId: string) => {
     const maxAttempts = 120;
     let attempts = 0;
