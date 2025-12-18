@@ -7,6 +7,26 @@ import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useCurrentFrame, useSelectedDriver, useSessionMetadata } from "../store/replayStore";
 
+function findSectorBoundaryIndices(sectors: number[] | undefined): { s1: number; s2: number } | null {
+  if (!sectors || sectors.length === 0) return null;
+
+  let s1Start = 0;
+  let s2Start = 0;
+
+  for (let i = 1; i < sectors.length; i++) {
+    if (sectors[i] !== sectors[i - 1]) {
+      if (s1Start === 0 && sectors[i] === 2) {
+        s1Start = i;
+      } else if (s2Start === 0 && sectors[i] === 3) {
+        s2Start = i;
+        break;
+      }
+    }
+  }
+
+  return s1Start > 0 && s2Start > 0 ? { s1: s1Start, s2: s2Start } : null;
+}
+
 export const TrackVisualization3D: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -14,6 +34,7 @@ export const TrackVisualization3D: React.FC = () => {
   const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
   const driverMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const driverLabelsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const sectorLabelsRef = useRef<HTMLDivElement[]>([]);
   const initRef = useRef(false);
   const currentFrame = useCurrentFrame();
   const selectedDriver = useSelectedDriver();
@@ -242,6 +263,41 @@ export const TrackVisualization3D: React.FC = () => {
 
       console.log("Camera positioned for top-down view, Center:", { centerX, centerY }, "Bounds:", { boundsX, boundsY, maxBound });
 
+      // Add sector labels as tags in the corner
+      if (geometry.sector && containerRef.current) {
+        const boundaries = findSectorBoundaryIndices(geometry.sector);
+        if (boundaries) {
+          const sectorInfo = [
+            { label: "SECTOR 1", color: "#00e5ff" },
+            { label: "SECTOR 2", color: "#b700ff" },
+            { label: "SECTOR 3", color: "#ffd400" },
+          ];
+
+          sectorInfo.forEach(({ label, color }, idx) => {
+            if (containerRef.current) {
+              const tagDiv = document.createElement("div");
+              tagDiv.textContent = label;
+              tagDiv.style.position = "absolute";
+              tagDiv.style.pointerEvents = "none";
+              tagDiv.style.padding = "8px 16px";
+              tagDiv.style.fontSize = "14px";
+              tagDiv.style.fontWeight = "bold";
+              tagDiv.style.color = color;
+              tagDiv.style.border = `2px solid ${color}`;
+              tagDiv.style.borderRadius = "4px";
+              tagDiv.style.backgroundColor = "rgba(15, 15, 18, 0.9)";
+              tagDiv.style.whiteSpace = "nowrap";
+              tagDiv.style.top = `${16 + idx * 52}px`;
+              tagDiv.style.left = "16px";
+              tagDiv.style.fontFamily = "monospace";
+
+              containerRef.current.appendChild(tagDiv);
+              sectorLabelsRef.current.push(tagDiv);
+            }
+          });
+        }
+      }
+
       if (trackGroup.children.length > 0) {
         scene.add(trackGroup);
         console.log("Track group added to scene, children:", trackGroup.children.length);
@@ -253,11 +309,15 @@ export const TrackVisualization3D: React.FC = () => {
         if (trackGroup.children.length > 0) {
           scene.remove(trackGroup);
         }
+        sectorLabelsRef.current.forEach((label) => label.remove());
+        sectorLabelsRef.current = [];
       };
     } catch (error) {
       console.error("Error building track geometry:", error);
       return () => {
         scene.remove(trackGroup);
+        sectorLabelsRef.current.forEach((label) => label.remove());
+        sectorLabelsRef.current = [];
       };
     }
   }, [sessionMetadata?.track_geometry]);
