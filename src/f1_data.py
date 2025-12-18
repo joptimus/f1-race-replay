@@ -155,7 +155,7 @@ def get_circuit_rotation(session):
     circuit = session.get_circuit_info()
     return circuit.rotation
 
-def get_race_telemetry(session, session_type='R'):
+def get_race_telemetry(session, session_type='R', refresh=False):
 
     event_name = str(session).replace(' ', '_')
     cache_suffix = 'sprint' if session_type == 'S' else 'race'
@@ -163,7 +163,7 @@ def get_race_telemetry(session, session_type='R'):
     # Check if this data has already been computed
 
     try:
-        if "--refresh-data" not in sys.argv:
+        if not refresh and "--refresh-data" not in sys.argv:
             with open(f"computed_data/{event_name}_{cache_suffix}_telemetry.pkl", "rb") as f:
                 frames = pickle.load(f)
                 print(f"Loaded precomputed {cache_suffix} telemetry data.")
@@ -181,13 +181,17 @@ def get_race_telemetry(session, session_type='R'):
     }
 
     grid_positions = {}
+    final_positions = {}
     try:
         results = session.results
         for _, row in results.iterrows():
             code = row["Abbreviation"]
             grid_positions[code] = int(row["GridPosition"])
+            # Also get final race positions
+            if "Position" in results.columns:
+                final_positions[code] = int(row["Position"])
     except Exception as e:
-        print(f"Warning: Could not get grid positions: {e}")
+        print(f"Warning: Could not get grid/final positions: {e}")
 
     driver_data = {}
 
@@ -335,10 +339,14 @@ def get_race_telemetry(session, session_type='R'):
     # 5. Build the frames + LIVE LEADERBOARD
     frames = []
     num_frames = len(timeline)
-    
+
     # Pre-extract data references for faster access
     driver_codes = list(resampled_data.keys())
     driver_arrays = {code: resampled_data[code] for code in driver_codes}
+
+    race_finished = False  # Flag to track once race end is detected
+
+    print(f"DEBUG: Starting frame processing. Total frames: {num_frames}, Timeline range: {timeline[0]:.1f}s to {timeline[-1]:.1f}s", flush=True)
 
     for i in range(num_frames):
         t = timeline[i]
@@ -366,13 +374,32 @@ def get_race_telemetry(session, session_type='R'):
 
         # 5b. Sort by race distance to get POSITIONS (1–20)
         # Leader = largest race distance covered
-        # For the first lap (very early in the race), use grid positions as primary sort
-        first_lap = all(car["lap"] <= 1.5 for car in snapshot)
-        if first_lap and grid_positions:
-            # Use grid position primarily, distance as tiebreaker
-            snapshot.sort(key=lambda r: (grid_positions.get(r["code"], 999), -r["dist"]))
+        # For the race start (very little distance covered), use grid positions
+        # For the race end, use official final positions
+        min_dist = min(car["dist"] for car in snapshot) if snapshot else 0
+        is_race_start = min_dist < 500  # Less than 500m into the race
+
+        # Check if race is finished: leader has rel_dist >= 0.99 (completed race)
+        max_rel_dist = max(car["rel_dist"] for car in snapshot) if snapshot else 0
+        if max_rel_dist >= 0.99 and final_positions:
+            race_finished = True
+
+        if is_race_start and grid_positions:
+            # Use grid position primarily, relative distance as tiebreaker
+            snapshot.sort(key=lambda r: (grid_positions.get(r["code"], 999), -r["rel_dist"]))
+        elif race_finished and final_positions:
+            # Once race is finished, always use official final race positions
+            snapshot.sort(key=lambda r: final_positions.get(r["code"], 999))
         else:
-            snapshot.sort(key=lambda r: r["dist"], reverse=True)
+            # During the race, sort by lap first, then by position on track (relative distance)
+            # Higher lap = ahead, higher rel_dist on that lap = ahead
+            snapshot.sort(key=lambda r: (-r["lap"], -r["rel_dist"]))
+
+        # Debug: Log frames based on time (user reported problems around 0.2m-0.5m)
+        time_seconds = t
+        if 10 < time_seconds < 35:  # 10-35 seconds into race (covers reported frame times)
+            debug_data = [(r["code"], round(r["lap"], 2), round(r["dist"], 1)) for r in snapshot[:5]]
+            print(f"DEBUG t={time_seconds:.1f}s frame {i}: TOP 5: {debug_data}", flush=True)
 
         leader = snapshot[0]
         leader_lap = leader["lap"]
@@ -768,7 +795,7 @@ def _process_quali_driver(args):
     }
 
 
-def get_quali_telemetry(session, session_type='Q'):
+def get_quali_telemetry(session, session_type='Q', refresh=False):
     # This function is going to get the results from qualifying and the telemetry for each drivers' fastest laps in each qualifying segment
 
     # The structure of the returned data will be:
@@ -789,7 +816,7 @@ def get_quali_telemetry(session, session_type='Q'):
 
     # Check if this data has already been computed
     try:
-        if "--refresh-data" not in sys.argv:
+        if not refresh and "--refresh-data" not in sys.argv:
             with open(f"computed_data/{event_name}_{cache_suffix}_telemetry.pkl", "rb") as f:
                 data = pickle.load(f)
                 print(f"Loaded precomputed {cache_suffix} telemetry data.")

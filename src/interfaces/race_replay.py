@@ -426,9 +426,9 @@ class F1RaceReplayWindow(arcade.Window):
         driver_list = []
         for code, pos in frame["drivers"].items():
             color = self.driver_colors.get(code, arcade.color.WHITE)
-            progress_m = driver_progress.get(code, float(pos.get("dist", 0.0)))
-            driver_list.append((code, color, pos, progress_m))
-        driver_list.sort(key=lambda x: x[3], reverse=True)
+            position = pos.get("position", 999)
+            driver_list.append((code, color, pos, position))
+        driver_list.sort(key=lambda x: x[3])
         self.leaderboard_comp.set_entries(driver_list)
         self.leaderboard_comp.draw(self)
         # expose rects for existing hit test compatibility if needed
