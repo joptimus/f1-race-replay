@@ -17,6 +17,7 @@ const os = require('os');
 const ROOT_DIR = __dirname;
 const BACKEND_DIR = path.join(ROOT_DIR, 'backend');
 const FRONTEND_DIR = path.join(ROOT_DIR, 'frontend');
+const SCRIPTS_DIR = path.join(ROOT_DIR, 'scripts');
 const NO_OPEN = process.argv.includes('--no-open');
 
 const colors = {
@@ -33,6 +34,31 @@ function log(color, label, message) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function cleanupProcesses() {
+  log(colors.cyan, 'CLEANUP', 'Cleaning up existing processes...');
+
+  try {
+    if (os.platform() === 'win32') {
+      const killScript = path.join(SCRIPTS_DIR, 'kill_all.bat');
+      if (fs.existsSync(killScript)) {
+        execSync(`"${killScript}"`, {
+          stdio: 'pipe',
+          timeout: 20000,
+        });
+      }
+    } else {
+      execSync('pkill -f "python.*main.py" 2>/dev/null; pkill -f "node.*dev" 2>/dev/null; true', {
+        stdio: 'pipe',
+      });
+    }
+    log(colors.green, 'CLEANUP', 'Process cleanup complete');
+  } catch (error) {
+    log(colors.yellow, 'CLEANUP', 'Cleanup script not available or failed - continuing startup');
+  }
+
+  await sleep(2000);
 }
 
 async function checkDependencies() {
@@ -155,6 +181,7 @@ ${colors.green}║           F1 Race Replay - Development Server              �
 ${colors.green}╚═══════════════════════════════════════════════════════════╝${colors.reset}
   `);
 
+  await cleanupProcesses();
   await checkDependencies();
   await installBackendDependencies();
   await installFrontendDependencies();
