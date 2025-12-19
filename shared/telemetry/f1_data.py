@@ -243,6 +243,9 @@ def _calculate_gaps(sorted_codes, frame_data):
                 dist_diff = leader_data["race_progress"] - data["race_progress"]
                 if dist_diff > 0 and current_speed_ms > 0:
                     gap_to_leader = distance_to_time_gap(dist_diff, current_speed_ms)
+                # DEBUG
+                if code in ["VER", "PIA"] and abs(dist_diff) < 100:
+                    print(f"DEBUG gap: {code} leader={leader_code} leader_prog={leader_data['race_progress']:.1f} {code}_prog={data['race_progress']:.1f} diff={dist_diff:.1f} gap={gap_to_leader:.3f}")
 
         gaps[code] = {
             "gap_to_previous": gap_to_previous,
@@ -654,6 +657,11 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             last_dist[code] = progress
 
         # Calculate gaps for this frame
+        # DEBUG at frame 50
+        if i == 50:
+            print(f"DEBUG frame 50: sorted_order = {sorted_codes[:5]}")
+            for code in sorted_codes[:3]:
+                print(f"  {code}: race_progress={frame_data_raw[code]['race_progress']:.1f}")
         current_gaps = _calculate_gaps(sorted_codes, frame_data)
 
 
