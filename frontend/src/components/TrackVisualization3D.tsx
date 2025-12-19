@@ -700,6 +700,23 @@ try {
     });
 
     drivers.forEach(([code, driver]) => {
+      const isRetired = driver.status === "Retired" || driver.status === "DNF" || driver.rel_dist >= 0.99;
+
+      if (isRetired) {
+        const mesh = driverMeshesRef.current.get(code);
+        if (mesh) {
+          scene.remove(mesh);
+          driverMeshesRef.current.delete(code);
+
+          const label = driverLabelsRef.current.get(code);
+          if (label) {
+            label.remove();
+            driverLabelsRef.current.delete(code);
+          }
+        }
+        return;
+      }
+
       const x = driver.x;
       const y = driver.y;
 

@@ -21,15 +21,20 @@ export const Leaderboard: React.FC = () => {
   const drivers = React.useMemo(() => {
     if (!currentFrame?.drivers) return [];
     return Object.entries(currentFrame.drivers)
-      .map(([code, data]) => ({
-        code,
-        data,
-        position: data.position,
-        color: metadata?.driver_colors?.[code] || [255, 255, 255],
-        isOut: raceStarted && data.speed === 0 && data.rel_dist < 0.99,
-      }))
+      .map(([code, data]) => {
+        // A driver is out if they're retired or have finished the race
+        const isRetired = data.status === "Retired" || data.status === "+1L" || data.status?.includes("DNF");
+        const isOut = isRetired;
+        return {
+          code,
+          data,
+          position: data.position,
+          color: metadata?.driver_colors?.[code] || [255, 255, 255],
+          isOut,
+        };
+      })
       .sort((a, b) => a.position - b.position);
-  }, [currentFrame, metadata?.driver_colors, raceStarted]);
+  }, [currentFrame, metadata?.driver_colors]);
 
   const isSafetyCarActive = React.useMemo(() => {
     if (!metadata?.track_statuses || !currentFrame) return false;
@@ -46,28 +51,34 @@ export const Leaderboard: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}>
+      <AnimatePresence mode="wait">
+        {isSafetyCarActive && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            style={{
+              width: '100%',
+              overflow: 'hidden',
+              flexShrink: 0,
+            }}
+          >
+            <img
+              src="/images/fia/safetycar.png"
+              alt="Safety Car"
+              style={{
+                width: '100%',
+                height: 'auto',
+                display: 'block',
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)', flexShrink: 0 }}>
-        <div className="f1-monospace" style={{ fontSize: '0.85rem', color: '#e10600', fontWeight: 900, marginBottom: '4px', position: 'relative', display: 'inline-block' }}>
+        <div className="f1-monospace" style={{ fontSize: '0.85rem', color: '#e10600', fontWeight: 900, marginBottom: '4px' }}>
           LAP: <span style={{ fontSize: '1rem' }}>{currentLap}/{totalLaps}</span>
-          <AnimatePresence>
-            {isSafetyCarActive && (
-              <motion.img
-                src="/images/fia/safetycar.png"
-                alt="Safety Car"
-                initial={{ opacity: 0, scale: 0.8, y: -10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.8, y: -10 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-                style={{
-                  position: 'absolute',
-                  top: '-8px',
-                  right: '-32px',
-                  height: '28px',
-                  width: 'auto',
-                }}
-              />
-            )}
-          </AnimatePresence>
         </div>
         <div className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af' }}>
           TIME: {currentFrame?.t ? (currentFrame.t / 60).toFixed(2) : '0.00'}m | FRAME: {currentFrame?.t !== undefined ? Math.round(currentFrame.t * 25) : 0}
@@ -88,40 +99,17 @@ export const Leaderboard: React.FC = () => {
             const hexColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
             const isFirstOutDriver = isOut && (index === 0 || !drivers[index - 1]?.isOut);
 
-            // Helper function to convert distance gap to time gap in seconds
-            const distanceToTime = (distanceGap: number, speed: number): string => {
-              if (speed <= 0 || distanceGap <= 0) return "0.000";
-              // distance in meters, speed in km/h
-              // convert speed to m/s: km/h * 1000 / 3600
-              const speedMs = (speed * 1000) / 3600;
-              const timeSeconds = distanceGap / speedMs;
-              return `+${timeSeconds.toFixed(3)}`;
+            // Get gap values from backend (updated every 3 seconds)
+            const gap_to_previous = data.gap_to_previous || 0;
+            const gap_to_leader = data.gap_to_leader || 0;
+
+            const formatGap = (gapSeconds: number): string => {
+              if (gapSeconds === 0) return "LEADER";
+              return `+${gapSeconds.toFixed(3)}`;
             };
 
-            // Calculate gap to previous driver (gap to car ahead)
-            let gapToPrevious = "LEADER";
-            let gapToLeader = "-";
-
-            if (index > 0) {
-              const prevDriver = drivers[index - 1];
-              if (!prevDriver.isOut) {
-                const prevDistance = prevDriver.data.dist || 0;
-                const currentDistance = data.dist || 0;
-                const distanceGap = prevDistance - currentDistance;
-                const prevSpeed = prevDriver.data.speed || 0;
-                gapToPrevious = distanceToTime(distanceGap, prevSpeed);
-              }
-            }
-
-            // Calculate gap to leader
-            const leader = drivers.find(d => !d.isOut);
-            if (leader && leader.code !== code) {
-              const leaderDistance = leader.data.dist || 0;
-              const currentDistance = data.dist || 0;
-              const distanceGap = leaderDistance - currentDistance;
-              const leaderSpeed = leader.data.speed || 0;
-              gapToLeader = distanceToTime(distanceGap, leaderSpeed);
-            }
+            const gapToPrevious = formatGap(gap_to_previous);
+            const gapToLeader = formatGap(gap_to_leader);
 
             return (
               <React.Fragment key={code}>
