@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useReplayStore, useSelectedDriver, useSectorColors } from "./store/replayStore";
 import { useReplayWebSocket } from "./hooks/useReplayWebSocket";
+import { LightsBoard } from "./components/LightsBoard";
 import { TrackVisualization3D } from "./components/TrackVisualization3D";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { Leaderboard } from "./components/Leaderboard";
@@ -142,6 +143,9 @@ const ReplayView = ({ onSessionSelect, onRefreshData, onSessionTypeChange }: { o
   const { isConnected } = useReplayWebSocket(session.sessionId);
   const { isEnabled: showSectorColors, toggle: toggleSectorColors } = useSectorColors();
 
+  const handleLightsSequenceComplete = () => {
+  };
+
   // Update total frames when session metadata changes
   useEffect(() => {
     if (session.metadata?.total_frames) {
@@ -159,6 +163,7 @@ const ReplayView = ({ onSessionSelect, onRefreshData, onSessionTypeChange }: { o
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <LightsBoard onSequenceComplete={handleLightsSequenceComplete} />
       <VerticalNavMenu />
       <div className="app-container">
         <header className="app-header">
