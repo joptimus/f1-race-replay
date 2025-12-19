@@ -59,7 +59,30 @@ export const useReplayWebSocket = (sessionId: string | null) => {
 
     wsRef.current.onmessage = async (event) => {
       try {
-        // Convert Blob to Uint8Array for msgpack deserialization
+        // Handle JSON control messages (ready, status, error)
+        if (typeof event.data === 'string') {
+          const message = JSON.parse(event.data);
+
+          if (message.type === 'ready') {
+            console.log("[WS Client] Session ready - frames:", message.frames, "load time:", message.load_time_seconds + "s");
+            return;
+          }
+
+          if (message.type === 'status') {
+            console.log("[WS Client] Status:", message.message, `(${message.elapsed_seconds}s)`);
+            return;
+          }
+
+          if (message.error) {
+            console.error("[WS Client] Server error:", message.error);
+            return;
+          }
+
+          console.warn("[WS Client] Unknown control message:", message);
+          return;
+        }
+
+        // Handle binary msgpack frame data
         let data: Uint8Array;
         if (event.data instanceof Blob) {
           const arrayBuffer = await event.data.arrayBuffer();
@@ -81,7 +104,7 @@ export const useReplayWebSocket = (sessionId: string | null) => {
           console.error("[WS Client] Frame has error property:", decoded.error);
         }
       } catch (error) {
-        console.error("[WS Client] Failed to decode frame:", error);
+        console.error("[WS Client] Failed to decode message:", error);
       }
     };
 
