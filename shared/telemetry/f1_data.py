@@ -555,6 +555,9 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     total_race_distance = circuit_length * max_lap_number
     FINISH_EPSILON = min(0.01 * circuit_length, 50.0)  # 1% of circuit or 50m, whichever is tighter
 
+    # Grid phase: Show grid order only for the first 50 frames (~2 seconds at 25 FPS)
+    # Frame 50 shows correct grid order before drivers start passing each other
+    GRID_PHASE_END_FRAME = 50
 
     for i in range(num_frames):
         t = timeline[i]
@@ -620,10 +623,10 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 # Use authoritative race start time from track status
                 is_race_start = 0 <= (t - race_start_time) <= 10.0
             else:
-                # Fallback: Show grid order during first 5 seconds if leader is on lap 1
+                # Fallback: Show grid order until GRID_PHASE_END_FRAME
                 # This handles formation laps where track status is delayed
-                # 5 seconds is short enough that drivers don't start passing before switching to race_progress sorting
-                is_race_start = (leader_lap <= 1) and (t <= 5.0)
+                # Frame 50 (~2 seconds) shows correct grid order before drivers start passing each other
+                is_race_start = (leader_lap <= 1) and (i <= GRID_PHASE_END_FRAME)
         else:
             is_race_start = False
 
