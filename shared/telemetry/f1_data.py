@@ -547,6 +547,12 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     current_gaps = {}  # Cached gaps from last update
     gaps_initialized = False  # Track if gaps have been calculated at least once
 
+    # Calculate total race distance and finish epsilon
+    total_race_distance = circuit_length * max_lap_number
+    FINISH_EPSILON = min(0.01 * circuit_length, 50.0)  # 1% of circuit or 50m, whichever is tighter
+
+    print(f"DEBUG: circuit_length={circuit_length}m, max_laps={max_lap_number}, total_distance={total_race_distance}m, epsilon={FINISH_EPSILON}m")
+
     for i in range(num_frames):
         t = timeline[i]
 
