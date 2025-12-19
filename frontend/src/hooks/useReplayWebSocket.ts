@@ -19,8 +19,9 @@ export const useReplayWebSocket = (sessionId: string | null) => {
   const setCurrentFrame = useReplayStore((state) => state.setCurrentFrame);
   const playback = useReplayStore((state) => state.playback);
   const lastSentCommandRef = useRef<WebSocketMessage | null>(null);
+  const sendCommandRef = useRef<(message: WebSocketMessage) => void>();
 
-  // Send control commands to server
+  // Create sendCommand function (store in ref to avoid dependency issues)
   const sendCommand = useCallback((message: WebSocketMessage) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       // Debounce identical commands within 100ms
@@ -34,6 +35,11 @@ export const useReplayWebSocket = (sessionId: string | null) => {
       }
     }
   }, []);
+
+  // Keep sendCommand in ref so it doesn't cause effect re-runs
+  useEffect(() => {
+    sendCommandRef.current = sendCommand;
+  }, [sendCommand]);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -57,7 +63,9 @@ export const useReplayWebSocket = (sessionId: string | null) => {
     wsRef.current.onopen = () => {
       console.log("[WS Client] Connection opened, requesting initial frame");
       // Request initial frame when connection opens
-      sendCommand({ action: "seek", frame: 0 });
+      if (sendCommandRef.current) {
+        sendCommandRef.current({ action: "seek", frame: 0 });
+      }
     };
 
     wsRef.current.onmessage = async (event) => {
@@ -125,7 +133,7 @@ export const useReplayWebSocket = (sessionId: string | null) => {
         wsRef.current.close();
       }
     };
-  }, [sendCommand, sessionId]);
+  }, [sessionId]);
 
   // Sync playback state to WebSocket
   useEffect(() => {
@@ -135,14 +143,14 @@ export const useReplayWebSocket = (sessionId: string | null) => {
     }
 
     if (playback.isPlaying) {
-      sendCommand({
+      sendCommandRef.current?.({
         action: "play",
         speed: playback.speed,
       });
     } else {
-      sendCommand({ action: "pause" });
+      sendCommandRef.current?.({ action: "pause" });
     }
-  }, [playback.isPlaying, playback.speed, sendCommand]);
+  }, [playback.isPlaying, playback.speed]);
 
   // Sync frame index (seeking) to WebSocket
   useEffect(() => {
@@ -151,13 +159,15 @@ export const useReplayWebSocket = (sessionId: string | null) => {
       return;
     }
 
-    sendCommand({ action: "seek", frame: playback.frameIndex });
-  }, [playback.frameIndex, sendCommand]);
+    sendCommandRef.current?.({ action: "seek", frame: playback.frameIndex });
+  }, [playback.frameIndex]);
 
   return {
     isConnected: wsRef.current?.readyState === WebSocket.OPEN,
     sendSeek: (frameIndex: number) => {
-      sendCommand({ action: "seek", frame: frameIndex });
+      if (sendCommandRef.current) {
+        sendCommandRef.current({ action: "seek", frame: frameIndex });
+      }
     },
   };
 };
