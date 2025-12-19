@@ -671,14 +671,20 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 # OUT drivers get positions after all active drivers
                 frame_data[code]["position"] = len(active_codes) + out_codes.index(code) + 1
 
-        # DEBUG: Log driver positions at key frames
-        if i in [100, 200, 300, 400, 500, 600]:
-            _debug_log(f"\nDEBUG frame {i} positions (t={t:.2f}s):")
+        # DEBUG: Log all driver data at key frames
+        if i in [0, 100, 200, 300, 400, 500, 600, 700]:
+            _debug_log(f"\nDEBUG frame {i} (t={t:.2f}s):")
             for idx, code in enumerate(sorted_codes):  # All drivers
                 prog = frame_data[code]["race_progress"]
                 pos = frame_data[code]["position"]
                 grid = grid_positions.get(code, "?")
-                _debug_log(f"  Position {pos}: {code} - race_progress={prog:.2f}, grid_pos={grid}")
+                lap = frame_data[code]["lap"]
+                speed = frame_data[code]["speed"]
+                tyre = frame_data[code]["tyre"]
+                gear = frame_data[code]["gear"]
+                drs = frame_data[code]["drs"]
+                status = frame_data[code]["status"]
+                _debug_log(f"  Position {pos}: {code} - race_progress={prog:.2f}, grid_pos={grid}, lap={lap}, speed={speed:.1f}km/h, tyre={tyre}, gear={gear}, drs={drs}, status={status}")
 
         # Check distance monotonicity per driver (warns if data is non-monotonic)
         for code in sorted_codes:
