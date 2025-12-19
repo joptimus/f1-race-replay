@@ -607,11 +607,13 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         active_codes = [code for code in driver_codes if not driver_retired[code]]
         out_codes = [code for code in driver_codes if driver_retired[code]]
 
-        # DEBUG frame 50-51: Show active_codes before sorting
-        if i in [50, 51]:
-            _debug_log(f"DEBUG frame {i} BEFORE SORTING: active_codes={active_codes} (count={len(active_codes)})")
-            if "DOO" in frame_data_raw:
-                _debug_log(f"  DOO: race_progress={frame_data_raw['DOO']['race_progress']:.2f}, lap={frame_data_raw['DOO']['lap']}, speed={frame_data_raw['DOO']['speed']:.1f}")
+        # DEBUG frame 0-1: Show HAD retirement status
+        if i in [0, 1]:
+            had_retired = driver_retired.get("HAD", False)
+            had_zero_speed_time = driver_zero_speed_time.get("HAD", 0.0)
+            had_speed = frame_data_raw.get("HAD", {}).get("speed", 0)
+            had_progress = frame_data_raw.get("HAD", {}).get("race_progress", 0)
+            _debug_log(f"DEBUG frame {i} HAD: retired={had_retired}, zero_speed_time={had_zero_speed_time:.2f}s, speed={had_speed:.1f}, race_progress={had_progress:.2f}, in_active_codes={'HAD' in active_codes}")
 
         # IDENTIFY CURRENT LEADER (from active drivers only, using consolidated retirement tracking)
         if active_codes:
@@ -671,7 +673,16 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 # OUT drivers get positions after all active drivers
                 frame_data[code]["position"] = len(active_codes) + out_codes.index(code) + 1
 
-            # Check distance monotonicity per driver (warns if data is non-monotonic)
+        # DEBUG: Log driver positions at key frames
+        if i in [100, 200, 300, 400, 500, 600]:
+            _debug_log(f"\nDEBUG frame {i} positions (t={t:.2f}s):")
+            for idx, code in enumerate(sorted_codes[:10]):  # Top 10 positions
+                prog = frame_data[code]["race_progress"]
+                pos = frame_data[code]["position"]
+                _debug_log(f"  Position {pos}: {code} - race_progress={prog:.2f}")
+
+        # Check distance monotonicity per driver (warns if data is non-monotonic)
+        for code in sorted_codes:
             progress = frame_data[code]["race_progress"]
             if progress + 1e-3 < last_dist[code]:
                 print(
