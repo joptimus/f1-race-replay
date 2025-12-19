@@ -146,6 +146,7 @@ const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year
   const { isEnabled: showSectorColors, toggle: toggleSectorColors } = useSectorColors();
 
   const handlePlayWithLights = () => {
+    console.log('handlePlayWithLights called, ref:', lightsBoardRef.current);
     setLightsSequenceActive(true);
     play();
     lightsBoardRef.current?.startSequence();

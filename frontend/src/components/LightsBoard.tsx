@@ -10,10 +10,14 @@ export interface LightsBoardHandle {
 }
 
 export const LightsBoard = forwardRef<LightsBoardHandle, LightsBoardProps>(({ onSequenceComplete }, ref) => {
-  const { isVisible, lightsOn, currentPhase, canSkip, skipSequence, startSequence, mainAudioRef } = useLightsBoard();
+  const lightsBoard = useLightsBoard();
+  const { isVisible, lightsOn, currentPhase, canSkip, skipSequence, startSequence, mainAudioRef } = lightsBoard;
 
   useImperativeHandle(ref, () => ({
-    startSequence,
+    startSequence: () => {
+      console.log('LightsBoard: startSequence called');
+      startSequence();
+    },
   }));
 
   // Notify parent when sequence completes
