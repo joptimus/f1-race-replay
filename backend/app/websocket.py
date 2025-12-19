@@ -1,3 +1,19 @@
+"""
+WebSocket handler for F1 Race Replay real-time frame streaming.
+
+Logging Format:
+  All log messages follow the format: [YYYY-MM-DD HH:MM:SS] [module.path] [LEVEL] [TAG] message
+
+  Tags used in this module:
+    [WS] - WebSocket connection and frame streaming events
+
+  Example log sequence:
+    [2025-12-19 11:40:57] [backend.websocket] [INFO] [WS] Client connected for session 2025_1_R
+    [2025-12-19 11:40:59] [backend.websocket] [DEBUG] [WS] Sent status update to 2025_1_R: Loading...
+    [2025-12-19 11:41:01] [backend.websocket] [INFO] [WS] Session 2025_1_R loaded with 154173 frames in 3.5s
+    [2025-12-19 11:41:01] [backend.websocket] [INFO] [WS] Connection closed for 2025_1_R after 4.2s (0 frames sent)
+"""
+
 import asyncio
 import logging
 import time
