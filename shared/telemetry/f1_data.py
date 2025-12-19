@@ -605,6 +605,10 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         active_codes = [code for code in driver_codes if not driver_retired[code] and driver_statuses.get(code, "Finished") == "Finished"]
         out_codes = [code for code in driver_codes if driver_retired[code] or driver_statuses.get(code, "Finished") != "Finished"]
 
+        # DEBUG frame 50-51: Show active_codes before sorting
+        if i in [50, 51]:
+            _debug_log(f"DEBUG frame {i} BEFORE SORTING: active_codes={active_codes}")
+
         # IDENTIFY CURRENT LEADER (from active drivers only, using consolidated retirement tracking)
         if active_codes:
             current_leader = max(active_codes, key=lambda c: frame_data_raw[c]["race_progress"])
@@ -637,18 +641,20 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         # STATE-AWARE SORTING
         if is_race_start and grid_positions:
             active_codes.sort(key=lambda code: grid_positions.get(code, 999))
-            # DEBUG: Show sorted order during race start
-            if i == 0:
-                _debug_log(f"DEBUG frame {i}: is_race_start=True, sorted grid order:")
-                for idx, code in enumerate(active_codes):
-                    grid_pos = grid_positions.get(code, "?")
-                    _debug_log(f"  Position {idx + 1}: {code} (grid pos {grid_pos})")
         elif race_finished and final_positions:
             active_codes.sort(key=lambda code: final_positions.get(code, 999))
         else:
             active_codes.sort(key=lambda code: -frame_data_raw[code]["race_progress"])
 
         sorted_codes = active_codes + out_codes
+
+        # DEBUG: Log all drivers at frame 50 and 51 (grid phase transition)
+        if i in [50, 51]:
+            _debug_log(f"\nDEBUG frame {i}: is_race_start={is_race_start}, sorted_codes={sorted_codes}")
+            for idx, code in enumerate(sorted_codes):
+                prog = frame_data_raw[code]["race_progress"]
+                grid = grid_positions.get(code, "?")
+                _debug_log(f"  Position {idx + 1}: {code} - race_progress={prog:.2f}, grid_pos={grid}")
 
         # Calculate positions and gaps for this frame
         frame_data = {}
@@ -672,11 +678,6 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             last_dist[code] = progress
 
         # Calculate gaps for this frame
-        # DEBUG: Show when VER passes PIA in race_progress
-        if i in [50, 100, 110, 150, 200, 250]:
-            ver_prog = frame_data_raw.get("VER", {}).get("race_progress", 0)
-            pia_prog = frame_data_raw.get("PIA", {}).get("race_progress", 0)
-            _debug_log(f"DEBUG frame {i}: t={t:.2f}s is_race_start={is_race_start} VER_prog={ver_prog:.1f} PIA_prog={pia_prog:.1f} sorted_order = {sorted_codes[:5]}")
         current_gaps = _calculate_gaps(sorted_codes, frame_data)
 
 
