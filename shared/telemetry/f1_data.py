@@ -435,7 +435,9 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     for status in track_status.to_dict('records'):
         seconds = timedelta.total_seconds(status['Time'])
 
-        start_time = seconds - global_t_min # Shift to match timeline
+        # Track status times are already in session timeline (seconds from session start)
+        # Don't shift by global_t_min - that's only for telemetry normalization
+        start_time = seconds
         end_time = None
 
         # Set the end time of the previous status
@@ -508,12 +510,10 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         if not reference_lap.empty:
             ref_distances = reference_lap["Distance"].to_numpy()
             circuit_length = ref_distances[-1] - ref_distances[0] if len(ref_distances) > 1 else 0.0
-            print(f"DEBUG: Calculated circuit_length = {circuit_length:.1f}m from reference lap", flush=True)
     except Exception as e:
         print(f"WARNING: Could not calculate circuit_length: {e}", flush=True)
         circuit_length = 5000.0  # Fallback estimate
 
-    print(f"DEBUG: Starting frame processing. Total frames: {num_frames}, Timeline range: {timeline[0]:.1f}s to {timeline[-1]:.1f}s, Circuit length: {circuit_length:.1f}m", flush=True)
 
     # OPTIMIZATION: Pre-compute race_progress for all drivers at all frames to avoid repeated calculation
     # This also enables vectorized sorting operations
@@ -534,7 +534,6 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     total_race_distance = circuit_length * max_lap_number
     FINISH_EPSILON = min(0.01 * circuit_length, 50.0)  # 1% of circuit or 50m, whichever is tighter
 
-    print(f"DEBUG: circuit_length={circuit_length}m, max_laps={max_lap_number}, total_distance={total_race_distance}m, epsilon={FINISH_EPSILON}m")
 
     for i in range(num_frames):
         t = timeline[i]
@@ -643,11 +642,6 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         # Calculate gaps for this frame
         current_gaps = _calculate_gaps(sorted_codes, frame_data)
 
-        # Debug: Log state for early frames
-        if i in [0, 50, 100, 150, 155, 160]:
-            print(f"DEBUG frame {i} - t={t:.2f}s race_start_time={race_start_time} is_race_start={is_race_start} sorted_order: {sorted_codes[:5]}")
-            for code in sorted_codes[:3]:
-                print(f"  {code}: race_progress={frame_data_raw[code]['race_progress']:.1f}, lap={frame_data_raw[code]['lap']}, position={frame_data[code]['position']}")
 
         for code in sorted_codes:
             # Add gap data (always - every driver should have gap values)
