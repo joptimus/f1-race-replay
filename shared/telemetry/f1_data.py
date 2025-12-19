@@ -593,17 +593,6 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             else:
                 driver_zero_speed_time[code] = 0  # Reset if driver has any speed
 
-        # RACE START DETECTION - Priority: Use official track status timestamp
-        if current_leader:
-            if race_start_time is not None:
-                # Use authoritative race start time from track status
-                is_race_start = 0 <= (t - race_start_time) <= 10.0
-            else:
-                # Fallback: Leader on lap 1 and near start line
-                is_race_start = (leader_lap <= 1) and (leader_rel < 0.05)
-        else:
-            is_race_start = False
-
         # IDENTIFY ACTIVE AND RETIRED DRIVERS (single source of truth)
         # A driver is OUT if: (1) confirmed retired (speed=0 for 10s+) OR (2) marked retired by FastF1 (status field)
         # Use FastF1's official status field to avoid false positives from rel_dist crossing during intermediate laps
@@ -621,6 +610,17 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             leader_progress = 0.0
             leader_lap = 1
             leader_rel = 0.0
+
+        # RACE START DETECTION - Priority: Use official track status timestamp
+        if current_leader:
+            if race_start_time is not None:
+                # Use authoritative race start time from track status
+                is_race_start = 0 <= (t - race_start_time) <= 10.0
+            else:
+                # Fallback: Leader on lap 1 and near start line
+                is_race_start = (leader_lap <= 1) and (leader_rel < 0.05)
+        else:
+            is_race_start = False
 
         # RACE FINISH DETECTION - Only triggers once
         if not race_finished and current_leader and leader_progress >= (total_race_distance - FINISH_EPSILON) and final_positions:
