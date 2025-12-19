@@ -74,12 +74,12 @@ const LightsBoardComponent = ({ onSequenceComplete }: LightsBoardProps, ref: Rea
                 onClick={skipSequence}
                 style={{
                   position: 'absolute',
-                  top: '16px',
-                  right: '16px',
+                  bottom: '24px',
+                  right: '24px',
                   background: '#e10600',
                   color: 'white',
                   border: 'none',
-                  padding: '6px 12px',
+                  padding: '8px 16px',
                   borderRadius: '4px',
                   fontSize: '0.875rem',
                   fontWeight: 600,
