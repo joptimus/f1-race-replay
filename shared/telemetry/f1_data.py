@@ -15,6 +15,17 @@ from shared.lib.time import parse_time_string, format_time
 
 import pandas as pd
 
+# Debug logging helper
+_debug_log_file = None
+
+def _debug_log(message):
+    global _debug_log_file
+    if _debug_log_file is None:
+        log_path = Path(__file__).parent.parent.parent / "debug_telemetry.log"
+        _debug_log_file = open(log_path, "w")
+    _debug_log_file.write(message + "\n")
+    _debug_log_file.flush()
+
 def enable_cache():
     # Check if cache folder exists
     if not os.path.exists('.fastf1-cache'):
@@ -245,7 +256,7 @@ def _calculate_gaps(sorted_codes, frame_data):
                     gap_to_leader = distance_to_time_gap(dist_diff, current_speed_ms)
                 # DEBUG
                 if code in ["VER", "PIA"] and abs(dist_diff) < 100:
-                    print(f"DEBUG gap: {code} leader={leader_code} leader_prog={leader_data['race_progress']:.1f} {code}_prog={data['race_progress']:.1f} diff={dist_diff:.1f} gap={gap_to_leader:.3f}")
+                    _debug_log(f"DEBUG gap: {code} leader={leader_code} leader_prog={leader_data['race_progress']:.1f} {code}_prog={data['race_progress']:.1f} diff={dist_diff:.1f} gap={gap_to_leader:.3f}")
 
         gaps[code] = {
             "gap_to_previous": gap_to_previous,
@@ -326,9 +337,9 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     # DEBUG: Show grid order from data
     if grid_positions:
         sorted_grid = sorted(grid_positions.items(), key=lambda x: x[1])
-        print(f"DEBUG: Grid starting order from data:")
+        _debug_log(f"DEBUG: Grid starting order from data:")
         for code, pos in sorted_grid:
-            print(f"  Position {pos}: {code}")
+            _debug_log(f"  Position {pos}: {code}")
 
     driver_data = {}
     driver_lap_positions = {}  # Maps driver_code -> list of positions per lap
@@ -624,10 +635,10 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             active_codes.sort(key=lambda code: grid_positions.get(code, 999))
             # DEBUG: Show sorted order during race start
             if i == 0:
-                print(f"DEBUG frame {i}: is_race_start=True, sorted grid order:")
+                _debug_log(f"DEBUG frame {i}: is_race_start=True, sorted grid order:")
                 for idx, code in enumerate(active_codes):
                     grid_pos = grid_positions.get(code, "?")
-                    print(f"  Position {idx + 1}: {code} (grid pos {grid_pos})")
+                    _debug_log(f"  Position {idx + 1}: {code} (grid pos {grid_pos})")
         elif race_finished and final_positions:
             active_codes.sort(key=lambda code: final_positions.get(code, 999))
         else:
@@ -659,9 +670,9 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         # Calculate gaps for this frame
         # DEBUG at frame 50
         if i == 50:
-            print(f"DEBUG frame 50: sorted_order = {sorted_codes[:5]}")
+            _debug_log(f"DEBUG frame 50: sorted_order = {sorted_codes[:5]}")
             for code in sorted_codes[:3]:
-                print(f"  {code}: race_progress={frame_data_raw[code]['race_progress']:.1f}")
+                _debug_log(f"  {code}: race_progress={frame_data_raw[code]['race_progress']:.1f}")
         current_gaps = _calculate_gaps(sorted_codes, frame_data)
 
 
