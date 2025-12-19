@@ -320,6 +320,13 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     except Exception as e:
         print(f"Warning: Could not get grid/final positions: {e}")
 
+    # DEBUG: Show grid order from data
+    if grid_positions:
+        sorted_grid = sorted(grid_positions.items(), key=lambda x: x[1])
+        print(f"DEBUG: Grid starting order from data:")
+        for code, pos in sorted_grid:
+            print(f"  Position {pos}: {code}")
+
     driver_data = {}
     driver_lap_positions = {}  # Maps driver_code -> list of positions per lap
 
@@ -611,6 +618,12 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         # STATE-AWARE SORTING
         if is_race_start and grid_positions:
             active_codes.sort(key=lambda code: grid_positions.get(code, 999))
+            # DEBUG: Show sorted order during race start
+            if i == 0:
+                print(f"DEBUG frame {i}: is_race_start=True, sorted grid order:")
+                for idx, code in enumerate(active_codes):
+                    grid_pos = grid_positions.get(code, "?")
+                    print(f"  Position {idx + 1}: {code} (grid pos {grid_pos})")
         elif race_finished and final_positions:
             active_codes.sort(key=lambda code: final_positions.get(code, 999))
         else:
