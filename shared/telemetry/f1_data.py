@@ -674,7 +674,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         # DEBUG: Log driver positions at key frames
         if i in [100, 200, 300, 400, 500, 600]:
             _debug_log(f"\nDEBUG frame {i} positions (t={t:.2f}s):")
-            for idx, code in enumerate(sorted_codes[:10]):  # Top 10 positions
+            for idx, code in enumerate(sorted_codes):  # All drivers
                 prog = frame_data[code]["race_progress"]
                 pos = frame_data[code]["position"]
                 grid = grid_positions.get(code, "?")
