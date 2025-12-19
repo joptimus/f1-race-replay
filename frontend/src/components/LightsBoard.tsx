@@ -12,6 +12,7 @@ export interface LightsBoardHandle {
 const LightsBoardComponent = ({ onSequenceComplete }: LightsBoardProps, ref: React.Ref<LightsBoardHandle>) => {
   const lightsBoard = useLightsBoard();
   const { isVisible, lightsOn, currentPhase, canSkip, skipSequence, startSequence, mainAudioRef } = lightsBoard;
+  console.log('LightsBoard render:', { isVisible, lightsOn, currentPhase, canSkip });
 
   useImperativeHandle(ref, () => ({
     startSequence: () => {

@@ -27,10 +27,12 @@ export function useLightsBoard() {
 
   const startSequence = () => {
     console.log('useLightsBoard: startSequence called');
+    console.log('Before setState - isVisible:', isVisible, 'currentPhase:', currentPhase);
     setIsVisible(true);
     setCurrentPhase('lights');
     setLightsOn([false, false, false, false, false]);
     setCanSkip(true);
+    console.log('After setState calls');
     playLights();
   };
 
@@ -116,8 +118,10 @@ export function useLightsBoard() {
 
   useEffect(() => {
     if (currentPhase === 'audio' && mainAudioRef.current) {
+      console.log('Attaching audio end listener');
       mainAudioRef.current.addEventListener('ended', handleAudioEnd);
       return () => {
+        console.log('Removing audio end listener');
         mainAudioRef.current?.removeEventListener('ended', handleAudioEnd);
       };
     }
