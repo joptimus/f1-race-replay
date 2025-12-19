@@ -600,14 +600,14 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 driver_zero_speed_time[code] = 0  # Reset if driver has any speed
 
         # IDENTIFY ACTIVE AND RETIRED DRIVERS (single source of truth)
-        # A driver is OUT if: (1) confirmed retired (speed=0 for 10s+) OR (2) marked retired by FastF1 (status field)
-        # Use FastF1's official status field to avoid false positives from rel_dist crossing during intermediate laps
-        active_codes = [code for code in driver_codes if not driver_retired[code] and driver_statuses.get(code, "Finished") == "Finished"]
-        out_codes = [code for code in driver_codes if driver_retired[code] or driver_statuses.get(code, "Finished") != "Finished"]
+        # During race playback, only use driver_retired tracking (speed=0 for 10s+)
+        # Don't use final race status because it's not known during playback - show all on-track drivers
+        active_codes = [code for code in driver_codes if not driver_retired[code]]
+        out_codes = [code for code in driver_codes if driver_retired[code]]
 
         # DEBUG frame 50-51: Show active_codes before sorting
         if i in [50, 51]:
-            _debug_log(f"DEBUG frame {i} BEFORE SORTING: active_codes={active_codes}")
+            _debug_log(f"DEBUG frame {i} BEFORE SORTING: active_codes={active_codes} (count={len(active_codes)})")
 
         # IDENTIFY CURRENT LEADER (from active drivers only, using consolidated retirement tracking)
         if active_codes:
