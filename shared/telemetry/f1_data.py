@@ -254,9 +254,6 @@ def _calculate_gaps(sorted_codes, frame_data):
                 dist_diff = leader_data["race_progress"] - data["race_progress"]
                 if dist_diff > 0 and current_speed_ms > 0:
                     gap_to_leader = distance_to_time_gap(dist_diff, current_speed_ms)
-                # DEBUG
-                if code in ["VER", "PIA"] and abs(dist_diff) < 100:
-                    _debug_log(f"DEBUG gap: {code} leader={leader_code} leader_prog={leader_data['race_progress']:.1f} {code}_prog={data['race_progress']:.1f} diff={dist_diff:.1f} gap={gap_to_leader:.3f}")
 
         gaps[code] = {
             "gap_to_previous": gap_to_previous,
@@ -613,7 +610,8 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             had_zero_speed_time = driver_zero_speed_time.get("HAD", 0.0)
             had_speed = frame_data_raw.get("HAD", {}).get("speed", 0)
             had_progress = frame_data_raw.get("HAD", {}).get("race_progress", 0)
-            _debug_log(f"DEBUG frame {i} HAD: retired={had_retired}, zero_speed_time={had_zero_speed_time:.2f}s, speed={had_speed:.1f}, race_progress={had_progress:.2f}, in_active_codes={'HAD' in active_codes}")
+            had_grid_pos = grid_positions.get("HAD", "?")
+            _debug_log(f"DEBUG frame {i} HAD: retired={had_retired}, zero_speed_time={had_zero_speed_time:.2f}s, speed={had_speed:.1f}, race_progress={had_progress:.2f}, grid_pos={had_grid_pos}, in_active_codes={'HAD' in active_codes}")
 
         # IDENTIFY CURRENT LEADER (from active drivers only, using consolidated retirement tracking)
         if active_codes:
@@ -679,7 +677,8 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             for idx, code in enumerate(sorted_codes[:10]):  # Top 10 positions
                 prog = frame_data[code]["race_progress"]
                 pos = frame_data[code]["position"]
-                _debug_log(f"  Position {pos}: {code} - race_progress={prog:.2f}")
+                grid = grid_positions.get(code, "?")
+                _debug_log(f"  Position {pos}: {code} - race_progress={prog:.2f}, grid_pos={grid}")
 
         # Check distance monotonicity per driver (warns if data is non-monotonic)
         for code in sorted_codes:
