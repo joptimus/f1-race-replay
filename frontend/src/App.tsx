@@ -147,14 +147,16 @@ const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year
   const { isEnabled: showSectorColors, toggle: toggleSectorColors } = useSectorColors();
 
   const handlePlayWithLights = () => {
-    console.log('handlePlayWithLights called, ref:', lightsBoardRef.current);
+    console.log('handlePlayWithLights called, hasPlayedLights:', hasPlayedLights, 'ref:', lightsBoardRef.current);
     // Only show lights board if this is the first play (not a resume)
-    if (!hasPlayedLights && playback.currentFrame === 0) {
+    if (!hasPlayedLights) {
+      console.log('Showing lights board');
       setLightsSequenceActive(true);
       setHasPlayedLights(true);
       play();
       lightsBoardRef.current?.startSequence();
     } else {
+      console.log('Skipping lights board, already played');
       // Just resume playback without lights
       play();
     }
