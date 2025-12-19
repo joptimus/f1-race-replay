@@ -600,12 +600,6 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         min_dist = min(distances.values()) if distances else 0
         is_race_start = min_dist < 500  # Less than 500m into the race
 
-        max_rel_dist = max(
-            frame_data_raw[code].get("rel_dist", 0.0) for code in driver_codes
-        )
-        if max_rel_dist >= 0.99 and final_positions:
-            race_finished = True
-
         # IDENTIFY ACTIVE AND RETIRED DRIVERS (single source of truth)
         # A driver is OUT if: (1) confirmed retired (speed=0 for 10s+) OR (2) marked retired by FastF1 (status field)
         # Use FastF1's official status field to avoid false positives from rel_dist crossing during intermediate laps
@@ -623,6 +617,12 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             leader_progress = 0.0
             leader_lap = 1
             leader_rel = 0.0
+
+        # RACE FINISH DETECTION - Uses leader progress and epsilon
+        if current_leader and leader_progress >= (total_race_distance - FINISH_EPSILON) and final_positions:
+            race_finished = True
+        else:
+            race_finished = False
 
         # Determine ordering and assign positions
         if is_race_start and grid_positions:
