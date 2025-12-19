@@ -626,22 +626,14 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         if not race_finished and current_leader and leader_progress >= (total_race_distance - FINISH_EPSILON) and final_positions:
             race_finished = True
 
-        # Determine ordering and assign positions
+        # STATE-AWARE SORTING
         if is_race_start and grid_positions:
-            # Use grid position primarily, race_progress as tiebreaker
             active_codes.sort(key=lambda code: (grid_positions.get(code, 999), -frame_data_raw[code]["race_progress"]))
-            out_codes.sort(key=lambda code: (grid_positions.get(code, 999), -frame_data_raw[code]["race_progress"]))
         elif race_finished and final_positions:
-            # Once race is finished, always use official final race positions
             active_codes.sort(key=lambda code: final_positions.get(code, 999))
-            out_codes.sort(key=lambda code: final_positions.get(code, 999))
         else:
-            # During the race, sort by accumulated race progress
-            # Higher race_progress = more distance covered = ahead
             active_codes.sort(key=lambda code: -frame_data_raw[code]["race_progress"])
-            out_codes.sort(key=lambda code: -frame_data_raw[code]["race_progress"])
 
-        # Active drivers get positions 1..N, OUT drivers go after
         sorted_codes = active_codes + out_codes
 
         # Check if we should update positions and gaps
