@@ -77,11 +77,14 @@ const LightsBoardComponent = ({ onSequenceComplete }: LightsBoardProps, ref: Rea
               {lightsOn.map((isLit, idx) => (
                 <div
                   key={idx}
-                  className={`w-16 h-16 rounded-full transition-all duration-200 ${
-                    isLit
-                      ? 'bg-red-600 shadow-lg shadow-red-600'
-                      : 'bg-gray-800'
-                  }`}
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    backgroundColor: isLit ? '#dc2626' : '#1f2937',
+                    boxShadow: isLit ? '0 0 20px #dc2626, 0 0 40px #dc2626' : 'none',
+                    transition: 'all 200ms ease-out',
+                  }}
                 />
               ))}
             </div>
