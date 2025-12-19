@@ -532,24 +532,49 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         print(f"WARNING: Could not calculate circuit_length: {e}", flush=True)
         circuit_length = 5000.0  # Fallback estimate
 
+    # --- Use cumulative race distance + normalize at race start ---
 
-    # OPTIMIZATION: Pre-compute race_progress for all drivers at all frames to avoid repeated calculation
-    # This also enables vectorized sorting operations
+    # Figure out which frame index corresponds to *race start* in the shared timeline
+    # race_start_time is in "session seconds" (from track_status)
+    # timeline is "session seconds - global_t_min"
+    if race_start_time is not None:
+        abs_timeline = timeline + global_t_min  # convert back to absolute session time
+        race_start_idx = int(np.argmin(np.abs(abs_timeline - race_start_time)))
+    else:
+        race_start_idx = 0  # fallback: start of telemetry
+
+    # Pre-compute race_progress (meters since race start) for all drivers
     race_progress_all = {}
     for code in driver_codes:
         d = driver_arrays[code]
-        lap = np.maximum(np.round(d["lap"]), 1)  # Round to nearest lap, ensure >= 1
-        rel = d["rel_dist"].copy()  # Get rel_dist
-        # Handle NaN values: replace with previous valid value or 0
-        if np.isnan(rel).any():
-            for j in range(len(rel)):
-                if np.isnan(rel[j]):
-                    if j > 0 and not np.isnan(rel[j-1]):
-                        rel[j] = rel[j-1]  # Use previous value
+
+        # Start from the cumulative race distance you already built in _process_single_driver
+        rp = d["dist"].astype(float).copy()
+
+        # Handle NaNs by forward-fill (or 0 at start)
+        if np.isnan(rp).any():
+            for j in range(len(rp)):
+                if np.isnan(rp[j]):
+                    if j > 0 and not np.isnan(rp[j-1]):
+                        rp[j] = rp[j-1]
                     else:
-                        rel[j] = 0.0  # Or default to 0
-        rel = np.clip(rel, 0.0, 1.0)  # Clamp rel_dist to [0,1]
-        race_progress_all[code] = (lap - 1) * circuit_length + rel * circuit_length
+                        rp[j] = 0.0
+
+        # Enforce monotonicity (guard against tiny numeric regressions)
+        for j in range(1, len(rp)):
+            if rp[j] < rp[j - 1]:
+                rp[j] = rp[j - 1]
+
+        # Normalize to race start: everybody has race_progress = 0 at lights out
+        if 0 <= race_start_idx < len(rp):
+            base = rp[race_start_idx]
+        else:
+            base = rp[0]
+
+        rp -= base
+        rp[rp < 0] = 0.0  # don't allow negative progress
+
+        race_progress_all[code] = rp
 
     # Track retirement confirmation: driver must have speed=0 for at least 10 seconds
     # to be marked as retired (avoids false positives from pit stops or pauses)
