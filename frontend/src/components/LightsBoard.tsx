@@ -9,7 +9,7 @@ export interface LightsBoardHandle {
   startSequence: () => void;
 }
 
-export const LightsBoard = forwardRef<LightsBoardHandle, LightsBoardProps>(({ onSequenceComplete }, ref) => {
+const LightsBoardComponent = ({ onSequenceComplete }: LightsBoardProps, ref: React.Ref<LightsBoardHandle>) => {
   const lightsBoard = useLightsBoard();
   const { isVisible, lightsOn, currentPhase, canSkip, skipSequence, startSequence, mainAudioRef } = lightsBoard;
 
@@ -76,4 +76,6 @@ export const LightsBoard = forwardRef<LightsBoardHandle, LightsBoardProps>(({ on
       <audio ref={mainAudioRef} preload="auto" crossOrigin="anonymous" />
     </>
   );
-});
+};
+
+export const LightsBoard = forwardRef<LightsBoardHandle, LightsBoardProps>(LightsBoardComponent);
