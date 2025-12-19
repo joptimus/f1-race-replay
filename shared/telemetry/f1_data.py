@@ -588,7 +588,6 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 "sector1": float(d["sector1"][i]) if not np.isnan(d["sector1"][i]) else None,
                 "sector2": float(d["sector2"][i]) if not np.isnan(d["sector2"][i]) else None,
                 "sector3": float(d["sector3"][i]) if not np.isnan(d["sector3"][i]) else None,
-                "status": driver_statuses.get(code, "Finished"),
             }
 
             # Track retirement: update zero-speed duration
@@ -599,6 +598,9 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             else:
                 driver_zero_speed_time[code] = 0  # Reset if driver has any speed
 
+            # Set status based on current retirement state (not final race result)
+            frame_data_raw[code]["status"] = "Retired" if driver_retired[code] else "Finished"
+
         # IDENTIFY ACTIVE AND RETIRED DRIVERS (single source of truth)
         # During race playback, only use driver_retired tracking (speed=0 for 10s+)
         # Don't use final race status because it's not known during playback - show all on-track drivers
@@ -608,6 +610,8 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         # DEBUG frame 50-51: Show active_codes before sorting
         if i in [50, 51]:
             _debug_log(f"DEBUG frame {i} BEFORE SORTING: active_codes={active_codes} (count={len(active_codes)})")
+            if "DOO" in frame_data_raw:
+                _debug_log(f"  DOO: race_progress={frame_data_raw['DOO']['race_progress']:.2f}, lap={frame_data_raw['DOO']['lap']}, speed={frame_data_raw['DOO']['speed']:.1f}")
 
         # IDENTIFY CURRENT LEADER (from active drivers only, using consolidated retirement tracking)
         if active_codes:
