@@ -595,6 +595,22 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             else:
                 driver_zero_speed_time[code] = 0  # Reset if driver has any speed
 
+        # IDENTIFY ACTIVE AND RETIRED DRIVERS
+        active_codes = [code for code in driver_codes if code not in driver_retired or not driver_retired[code]]
+        out_codes_list = [code for code in driver_codes if code in driver_retired and driver_retired[code]]
+
+        # IDENTIFY CURRENT LEADER (from active drivers only)
+        if active_codes:
+            current_leader = max(active_codes, key=lambda c: frame_data_raw[c]["race_progress"])
+            leader_progress = frame_data_raw[current_leader]["race_progress"]
+            leader_lap = frame_data_raw[current_leader]["lap"]
+            leader_rel = frame_data_raw[current_leader]["rel_dist"]
+        else:
+            current_leader = None
+            leader_progress = 0.0
+            leader_lap = 1
+            leader_rel = 0.0
+
         # Determine sorting order based on race state
         # (Use precomputed frame_data_raw for state checks)
         min_dist = min(distances.values()) if distances else 0
