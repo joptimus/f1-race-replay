@@ -26,9 +26,6 @@ def enable_cache():
 FPS = 25
 DT = 1 / FPS
 
-POSITION_UPDATE_INTERVAL = 3  # seconds between position recalculations
-GAP_UPDATE_INTERVAL = 3       # seconds between gap recalculations
-
 def _process_single_driver(args):
     """Process telemetry data for a single driver - must be top-level for multiprocessing"""
     driver_no, session, driver_code = args
@@ -533,13 +530,6 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     driver_zero_speed_time = defaultdict(float)  # Track continuous zero-speed duration per driver
     driver_retired = defaultdict(bool)  # Track confirmed retirement status
 
-    # Position and gap update tracking
-    last_position_update_time = -POSITION_UPDATE_INTERVAL  # Force update on first frame
-    last_gap_update_time = -GAP_UPDATE_INTERVAL  # Force update on first frame
-    current_positions = {}  # Cached positions from last update
-    current_gaps = {}  # Cached gaps from last update
-    gaps_initialized = False  # Track if gaps have been calculated at least once
-
     # Calculate total race distance and finish epsilon
     total_race_distance = circuit_length * max_lap_number
     FINISH_EPSILON = min(0.01 * circuit_length, 50.0)  # 1% of circuit or 50m, whichever is tighter
@@ -629,11 +619,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
 
         sorted_codes = active_codes + out_codes
 
-        # Check if we should update positions and gaps
-        should_update_positions = (t - last_position_update_time) >= POSITION_UPDATE_INTERVAL
-        should_update_gaps = (t - last_gap_update_time) >= GAP_UPDATE_INTERVAL
-
-        # Calculate positions for this frame
+        # Calculate positions and gaps for this frame
         frame_data = {}
         for code in sorted_codes:
             frame_data[code] = frame_data_raw[code].copy()
@@ -654,25 +640,10 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 )
             last_dist[code] = progress
 
-        # Update positions cache if due
-        if should_update_positions:
-            current_positions = {code: frame_data[code]["position"] for code in sorted_codes}
-            last_position_update_time = t
-
-        # Update gaps cache if due
-        if should_update_gaps:
-            current_gaps = _calculate_gaps(sorted_codes, frame_data)
-            last_gap_update_time = t
-
-        # Apply cached positions and gaps to frame data
-        # Initialize gaps on first frame if not yet calculated
-        if not gaps_initialized:
-            current_gaps = _calculate_gaps(sorted_codes, frame_data)
-            gaps_initialized = True
+        # Calculate gaps for this frame
+        current_gaps = _calculate_gaps(sorted_codes, frame_data)
 
         for code in sorted_codes:
-            # Use cached position if available, otherwise use current frame position
-            frame_data[code]["position"] = current_positions.get(code, frame_data[code]["position"])
             # Add gap data (always - every driver should have gap values)
             gap_data = current_gaps.get(code, {"gap_to_previous": 0.0, "gap_to_leader": 0.0})
             frame_data[code]["gap_to_previous"] = gap_data["gap_to_previous"]
