@@ -919,6 +919,13 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             if position is not None:
                 lap_boundaries[code][lap_idx] = position
 
+    # Phase 6: Check timing data coverage for diagnostics
+    has_good_coverage, coverage = _check_timing_data_coverage(stream_data)
+    if has_good_coverage:
+        print(f"[COVERAGE] Timing data coverage: {coverage:.1%} (using FIA stream position as primary)")
+    else:
+        print(f"[COVERAGE] WARNING: Timing data coverage only {coverage:.1%}. Fallback to distance-based ordering for sparse frames.")
+
     for i in range(num_frames):
         t = timeline[i]
         t_abs = t + global_t_min  # Convert to absolute session seconds for race-start comparison
@@ -955,9 +962,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             if timing_gap_df is not None and timing_pos_df is not None:
                 try:
                     gap = timing_gap_df.at[t_abs, code]
-                    pos = timing_pos_df.at[t_abs, code]
                     frame_data_raw[code]["gap"] = float(gap) if not pd.isna(gap) else None
-                    frame_data_raw[code]["pos_raw"] = int(pos) if not pd.isna(pos) else 0
 
                     if timing_interval_smooth_df is not None:
                         interval_smooth = timing_interval_smooth_df.at[t_abs, code]
@@ -966,12 +971,27 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                         frame_data_raw[code]["interval_smooth"] = None
                 except (KeyError, TypeError):
                     frame_data_raw[code]["gap"] = None
-                    frame_data_raw[code]["pos_raw"] = 0
                     frame_data_raw[code]["interval_smooth"] = None
             else:
                 frame_data_raw[code]["gap"] = None
-                frame_data_raw[code]["pos_raw"] = 0
                 frame_data_raw[code]["interval_smooth"] = None
+
+            # Phase 6: Extract stream position with per-frame fallback
+            if stream_data is not None and not stream_data.empty and code in stream_data['Driver'].values:
+                driver_stream = stream_data[stream_data['Driver'] == code]
+                if not driver_stream.empty:
+                    closest_idx = (driver_stream.index - t_abs).abs().argmin()
+                    stream_pos = driver_stream.iloc[closest_idx].get('Position')
+
+                    if pd.notna(stream_pos):
+                        frame_data_raw[code]["pos_raw"] = int(stream_pos)
+                    else:
+                        frame_data_raw[code]["pos_raw"] = None
+                        print(f"Frame {i}: {code} missing stream position, using distance-based fallback")
+                else:
+                    frame_data_raw[code]["pos_raw"] = None
+            else:
+                frame_data_raw[code]["pos_raw"] = None
 
             # Track retirement: update zero-speed duration
             if speed == 0:
