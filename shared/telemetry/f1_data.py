@@ -356,6 +356,10 @@ def sort_key_hybrid(code: str, frame_data_raw: dict) -> tuple:
     race_progress = data.get('race_progress', 0.0)
     race_progress_val = race_progress if not np.isnan(race_progress) else 0.0
 
+    # Diagnostic for TSU at frame 4527
+    if code == 'TSU' and pos_val == 16:  # pos_val 16 suggests TSU position
+        _debug_log(f"sort_key_hybrid(TSU): pos_raw={pos_raw}, interval_smooth={interval_smooth}, race_progress={race_progress} -> ({pos_val}, {interval_val}, {-race_progress_val})")
+
     return (pos_val, interval_val, -race_progress_val)
 
 
@@ -414,7 +418,12 @@ class PositionSmoothing:
         smoothed_order: list[str] = []
 
         for position_idx, current_driver in enumerate(sorted_codes):
-            previous_driver = self.previous_order[position_idx] if position_idx < len(self.previous_order) else None
+            # BUGFIX: If previous_order is shorter, treat as position change, not None
+            if position_idx < len(self.previous_order):
+                previous_driver = self.previous_order[position_idx]
+            else:
+                # New driver entering at this position (from longer field)
+                previous_driver = current_driver  # No hysteresis for new entries
 
             if current_driver != previous_driver:
                 time_since_last_change = current_time - self.last_change_time.get(position_idx, 0.0)
@@ -1072,6 +1081,25 @@ def get_race_telemetry(session, session_type='R', refresh=False):
 
         # Append retired drivers to end (they don't sort anymore)
         sorted_codes = sorted_codes + retired_codes
+
+        # Diagnostic: Check if TSU disappeared during problematic frames
+        if i == 4527:  # Frame where TSU disappears
+            print(f"\n[DEBUG] Frame {i} (t={t_abs:.2f}s):", flush=True)
+            print(f"  active_codes: {active_codes}", flush=True)
+            print(f"  retired_codes: {retired_codes}", flush=True)
+            if 'TSU' in frame_data_raw:
+                tsu_data = frame_data_raw['TSU']
+                tsu_key = sort_key_hybrid('TSU', frame_data_raw)
+                print(f"  TSU data: pos_raw={tsu_data.get('pos_raw')}, interval_smooth={tsu_data.get('interval_smooth')}, race_progress={tsu_data.get('race_progress')}", flush=True)
+                print(f"  TSU sort key: {tsu_key}", flush=True)
+            print(f"  sorted_codes: {sorted_codes}", flush=True)
+            print(f"  TSU in sorted_codes: {'TSU' in sorted_codes}", flush=True)
+            # Find which drivers have (9999, 9999, ...)
+            drivers_with_9999 = [c for c in active_codes if sort_key_hybrid(c, frame_data_raw)[0] == 9999]
+            print(f"  Drivers with pos_raw=None: {drivers_with_9999}", flush=True)
+            for c in drivers_with_9999:
+                d = frame_data_raw[c]
+                print(f"    {c}: pos_raw={d.get('pos_raw')}, interval_smooth={d.get('interval_smooth')}", flush=True)
 
         # STEP 7: Debug print to confirm FIA timing-based sorting
         if i in [0, 50, 200]:

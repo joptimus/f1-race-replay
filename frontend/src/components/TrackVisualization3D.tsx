@@ -94,6 +94,7 @@ export const TrackVisualization3D: React.FC = () => {
   const raycasterRef = useRef<THREE.Raycaster | null>(null);
   const mouseRef = useRef<THREE.Vector2 | null>(null);
   const initRef = useRef(false);
+  const initialCameraBoundsRef = useRef<{ left: number; right: number; top: number; bottom: number } | null>(null);
   const currentFrame = useCurrentFrame();
   const selectedDriver = useSelectedDriver();
   const sessionMetadata = useSessionMetadata();
@@ -103,6 +104,7 @@ export const TrackVisualization3D: React.FC = () => {
   const [showWeatherPanel, setShowWeatherPanel] = useState(true);
   const [temperatureUnit, setTemperatureUnit] = useState<'C' | 'F'>('C');
   const [enableWeatherFx, setEnableWeatherFx] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   // Setup scene and track (only once)
   useEffect(() => {
@@ -137,6 +139,15 @@ try {
   camera.position.set(0, 5000, 0);
   camera.lookAt(0, 0, 0);
   cameraRef.current = camera;
+
+  // Store initial camera bounds for zoom constraints
+  initialCameraBoundsRef.current = {
+    left: camera.left,
+    right: camera.right,
+    top: camera.top,
+    bottom: camera.bottom
+  };
+
   console.log("Orthographic camera created for top-down view");
 
   // Renderer setup
@@ -911,7 +922,7 @@ try {
     }
   }, [currentFrame?.weather?.rain_state]);
 
-  // Handle driver click detection
+  // Handle driver click detection and map zoom
   useEffect(() => {
     if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
 
@@ -952,13 +963,52 @@ try {
       }
     };
 
+    const handleCanvasWheel = (event: WheelEvent) => {
+      event.preventDefault();
+
+      if (!(cameraRef.current instanceof THREE.OrthographicCamera)) return;
+      if (!initialCameraBoundsRef.current) return;
+
+      const camera = cameraRef.current;
+      const zoomSpeed = 0.1;
+      const direction = event.deltaY > 0 ? 1 : -1;
+      const newZoom = Math.max(1, zoomLevel + direction * zoomSpeed);
+
+      // Constrain zoom between 1.0x (initial, no zoom out) and 5x (max zoom in)
+      if (newZoom <= 5) {
+        const zoomFactor = newZoom / zoomLevel;
+        setZoomLevel(newZoom);
+
+        // Adjust orthographic camera bounds based on initial bounds
+        // Higher zoom = smaller bounds = zoomed in view
+        const initialBounds = initialCameraBoundsRef.current;
+        camera.left = initialBounds.left / newZoom;
+        camera.right = initialBounds.right / newZoom;
+        camera.top = initialBounds.top / newZoom;
+        camera.bottom = initialBounds.bottom / newZoom;
+        camera.updateProjectionMatrix();
+
+        // Update sector label positions to follow zoom
+        sectorLabelsRef.current.forEach(label => {
+          if (label.style.position === 'absolute') {
+            const left = parseFloat(label.style.left) * zoomFactor;
+            const top = parseFloat(label.style.top) * zoomFactor;
+            label.style.left = `${left}px`;
+            label.style.top = `${top}px`;
+          }
+        });
+      }
+    };
+
     const canvas = rendererRef.current.domElement;
     canvas.addEventListener('click', handleCanvasClick);
+    canvas.addEventListener('wheel', handleCanvasWheel, { passive: false });
 
     return () => {
       canvas.removeEventListener('click', handleCanvasClick);
+      canvas.removeEventListener('wheel', handleCanvasWheel);
     };
-  }, [currentFrame, sessionMetadata, setSelectedDriver]);
+  }, [currentFrame, sessionMetadata, setSelectedDriver, zoomLevel]);
 
   const convertTemperature = (celsius: number): number => {
     if (temperatureUnit === 'F') {
