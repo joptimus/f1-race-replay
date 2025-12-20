@@ -507,6 +507,25 @@ def get_circuit_rotation(session):
     circuit = session.get_circuit_info()
     return circuit.rotation
 
+def _detect_retirement(code: str, frame_data_raw: dict) -> bool:
+    """
+    Determine if driver is retired based on status field.
+
+    Args:
+        code: Driver code
+        frame_data_raw: Per-driver frame data with status field
+
+    Returns:
+        bool (is_retired)
+    """
+    c = frame_data_raw.get(code, {})
+
+    status = c.get("status", "")
+    if status == "Retired":
+        return True
+
+    return False
+
 def get_race_telemetry(session, session_type='R', refresh=False):
 
     event_name = str(session).replace(' ', '_')

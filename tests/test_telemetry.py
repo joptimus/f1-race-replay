@@ -401,3 +401,36 @@ def test_apply_lap_anchor_single_driver():
 
     result = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
     assert result == ['HAM']
+
+
+def test_detect_retirement_from_status():
+    """Test that Retired status is detected"""
+    from shared.telemetry.f1_data import _detect_retirement
+
+    frame_data_raw = {
+        'HAM': {'status': 'Retired', 'speed': 0},
+    }
+
+    assert _detect_retirement('HAM', frame_data_raw) == True
+
+
+def test_detect_retirement_active_driver():
+    """Test that active driver is not marked as retired"""
+    from shared.telemetry.f1_data import _detect_retirement
+
+    frame_data_raw = {
+        'HAM': {'status': 'Finished', 'speed': 300},
+    }
+
+    assert _detect_retirement('HAM', frame_data_raw) == False
+
+
+def test_detect_retirement_missing_data():
+    """Test that missing data is handled gracefully"""
+    from shared.telemetry.f1_data import _detect_retirement
+
+    frame_data_raw = {
+        'HAM': {},
+    }
+
+    assert _detect_retirement('HAM', frame_data_raw) == False
