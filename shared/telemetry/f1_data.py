@@ -1063,14 +1063,14 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         except Exception:
             current_track_status = '1'
 
-        # Phase 5: Detect retirements BEFORE sorting
+        # Phase 5: Use driver_retired dictionary as single source of truth (updated via zero-speed tracking)
+        # Don't re-check _detect_retirement() - it creates inconsistency with driver_retired state
         for code in driver_codes:
-            if _detect_retirement(code, frame_data_raw):
-                frame_data_raw[code]["status"] = "Retired"
+            frame_data_raw[code]["status"] = "Retired" if driver_retired[code] else "Finished"
 
-        # Separate active from retired
-        active_codes = [c for c in driver_codes if frame_data_raw[c].get("status") != "Retired"]
-        retired_codes = [c for c in driver_codes if frame_data_raw[c].get("status") == "Retired"]
+        # Separate active from retired using consistent driver_retired tracking
+        active_codes = [c for c in driver_codes if not driver_retired[c]]
+        retired_codes = [c for c in driver_codes if driver_retired[c]]
 
         # STEP 4: HYBRID SORTING (Phase 2, Task 2.2)
         # Use 3-tier sorting: pos_raw (Tier 1), interval_smooth (Tier 1.5), race_progress (Tier 2)
