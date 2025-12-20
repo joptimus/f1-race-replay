@@ -926,6 +926,17 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     else:
         print(f"[COVERAGE] WARNING: Timing data coverage only {coverage:.1%}. Fallback to distance-based ordering for sparse frames.")
 
+    # Phase 7: Frame generation diagnostics
+    session_duration = timeline[-1] if len(timeline) > 0 else 0.0
+    estimated_time_seconds = num_frames * 0.001  # ~1ms per frame (conservative estimate)
+    print(f"\n[TELEMETRY] Starting frame generation:")
+    print(f"  Session duration: {session_duration:.0f}s")
+    print(f"  FPS: {FPS}, DT: {DT:.3f}s")
+    print(f"  Total frames: {num_frames:,}")
+    print(f"  Drivers: {len(driver_codes)}")
+    print(f"  Estimated time: {estimated_time_seconds:.0f}-{estimated_time_seconds*3:.0f}s (1-3ms per frame)")
+    print(f"  Progress every 250 frames (~{estimated_time_seconds/num_frames*250:.1f}s)\n", flush=True)
+
     for i in range(num_frames):
         if i % 250 == 0:
             print(f"[FRAMES] Processing frame {i}/{num_frames} ({100*i/num_frames:.1f}%)", flush=True)
@@ -1163,6 +1174,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         # Save current sorted order for next frame's pass detection
         prev_sorted_codes = sorted_codes
 
+    print(f"\n[TELEMETRY] ✓ Frame generation complete: {len(frames)} frames", flush=True)
     print("completed telemetry extraction...")
     print("Saving to cache file...")
     # If computed_data/ directory doesn't exist, create it
