@@ -338,6 +338,27 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         for code, pos in sorted_grid:
             _debug_log(f"  Position {pos}: {code}")
 
+    # STEP 1: Load timing data from FIA timing tower
+    timing_gap_df = None
+    timing_pos_df = None
+    try:
+        timing = session.timing_data.reset_index()
+        timing_gap_df = timing.pivot(index="Date", columns="Driver", values="GapToLeader")
+        timing_pos_df = timing.pivot(index="Date", columns="Driver", values="Position")
+
+        base_time = timing_gap_df.index[0]
+        timing_gap_df.index = (timing_gap_df.index - base_time).total_seconds()
+        timing_pos_df.index = timing_gap_df.index
+
+        timing_gap_df = timing_gap_df.ffill().bfill()
+        timing_pos_df = timing_pos_df.ffill().bfill()
+
+        print(f"Loaded FIA timing data with {len(timing_gap_df)} samples")
+    except Exception as e:
+        print(f"Warning: Could not load FIA timing data: {e}")
+        timing_gap_df = None
+        timing_pos_df = None
+
     driver_data = {}
     driver_lap_positions = {}  # Maps driver_code -> list of positions per lap
 
@@ -383,6 +404,21 @@ def get_race_telemetry(session, session_type='R', refresh=False):
 
     # 2. Create a timeline (start from zero)
     timeline = np.arange(global_t_min, global_t_max, DT) - global_t_min
+
+    # STEP 2: Align timing data to animation frames
+    abs_timeline = timeline + global_t_min
+    if timing_gap_df is not None and timing_pos_df is not None:
+        try:
+            timing_gap_df = timing_gap_df.reindex(abs_timeline, method="nearest", tolerance=0.25)
+            timing_gap_df = timing_gap_df.ffill().bfill()
+
+            timing_pos_df = timing_pos_df.reindex(abs_timeline, method="nearest", tolerance=0.25)
+            timing_pos_df = timing_pos_df.ffill().bfill()
+            print(f"Aligned timing data to {len(abs_timeline)} animation frames")
+        except Exception as e:
+            print(f"Warning: Could not align timing data to timeline: {e}")
+            timing_gap_df = None
+            timing_pos_df = None
 
     # 3. Resample each driver's telemetry (x, y, gap) onto the common timeline
     resampled_data = {}
@@ -586,15 +622,6 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     total_race_distance = circuit_length * max_lap_number
     FINISH_EPSILON = min(0.01 * circuit_length, 50.0)  # 1% of circuit or 50m, whichever is tighter
 
-    # Grid phase: Show grid order only for the first 50 frames (~2 seconds at 25 FPS)
-    # Frame 50 shows correct grid order before drivers start passing each other
-    GRID_PHASE_END_FRAME = 50
-
-    # Pass detection: track previous order to avoid full re-sorts
-    # Only allow position changes when a driver actually passes the one ahead (by PASS_MARGIN meters)
-    prev_sorted_codes = None
-    PASS_MARGIN = 10.0  # meters - ignore small jitter
-
     for i in range(num_frames):
         t = timeline[i]
         t_abs = t + global_t_min  # Convert to absolute session seconds for race-start comparison
@@ -626,6 +653,20 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 "sector2": float(d["sector2"][i]) if not np.isnan(d["sector2"][i]) else None,
                 "sector3": float(d["sector3"][i]) if not np.isnan(d["sector3"][i]) else None,
             }
+
+            # STEP 3: Inject timing data into frame
+            if timing_gap_df is not None and timing_pos_df is not None:
+                try:
+                    gap = timing_gap_df.at[t_abs, code]
+                    pos = timing_pos_df.at[t_abs, code]
+                    frame_data_raw[code]["gap"] = float(gap) if not pd.isna(gap) else None
+                    frame_data_raw[code]["pos_raw"] = int(pos) if not pd.isna(pos) else 0
+                except (KeyError, TypeError):
+                    frame_data_raw[code]["gap"] = None
+                    frame_data_raw[code]["pos_raw"] = 0
+            else:
+                frame_data_raw[code]["gap"] = None
+                frame_data_raw[code]["pos_raw"] = 0
 
             # Track retirement: update zero-speed duration
             if speed == 0:
@@ -663,84 +704,33 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             leader_progress = 0.0
             leader_lap = 1
 
-        # RACE START DETECTION - Priority: Use official track status timestamp with absolute time
-        # race_start_time is in absolute session seconds; t_abs is absolute, so compare them directly
-        if current_leader:
-            use_track_status = race_start_time is not None and t_abs >= race_start_time
-            if use_track_status:
-                # Use authoritative race start time from track status
-                is_race_start = 0 <= (t_abs - race_start_time) <= 10.0
-            else:
-                # Fallback: Show grid order until GRID_PHASE_END_FRAME
-                # This handles formation laps where track status is delayed
-                # Frame 50 (~2 seconds) shows correct grid order before drivers start passing each other
-                is_race_start = (leader_lap <= 1) and (i <= GRID_PHASE_END_FRAME)
-        else:
-            is_race_start = False
-
         # RACE FINISH DETECTION - Only triggers once
         if not race_finished and current_leader and leader_progress >= (total_race_distance - FINISH_EPSILON) and final_positions:
             race_finished = True
 
-        # STATE-AWARE SORTING WITH PASS DETECTION
-        # Instead of re-sorting the entire field every frame, we:
-        # 1. Use grid order at race start
-        # 2. Use final positions at race finish
-        # 3. Otherwise, allow only local passes (bubble sort with race_progress constraints)
+        # STEP 4: TIMING-BASED SORTING
+        # Use official FIA position data, with fallbacks to gap and distance
+        def sort_key(code):
+            c = frame_data_raw[code]
 
-        if i == 0 or not prev_sorted_codes:
-            # Frame 0 or first frame: use grid order for active drivers
-            if is_race_start and grid_positions:
-                sorted_codes = sorted(active_codes, key=lambda c: grid_positions.get(c, 999)) + out_codes
-            elif race_finished and final_positions:
-                sorted_codes = sorted(active_codes, key=lambda c: final_positions.get(c, 999)) + out_codes
-            else:
-                # Fallback: sort by race_progress for first frame
-                sorted_codes = sorted(active_codes, key=lambda c: -frame_data_raw[c]["race_progress"]) + out_codes
-        else:
-            # Subsequent frames: start from previous order, allow only local passes
-            if is_race_start and grid_positions:
-                # During race start: use grid order
-                sorted_codes = sorted(active_codes, key=lambda c: grid_positions.get(c, 999)) + out_codes
-            elif race_finished and final_positions:
-                # At race finish: snap to official result
-                sorted_codes = sorted(active_codes, key=lambda c: final_positions.get(c, 999)) + out_codes
-            else:
-                # Normal race: use pass-detection bubble sort
-                # Start from previous active order, keep retired drivers at bottom
-                sorted_codes = [c for c in prev_sorted_codes if c in active_codes] + out_codes
+            pos_val = c["pos_raw"] if c["pos_raw"] > 0 else 9999
+            gap_val = c["gap"] if c["gap"] is not None else 9999
+            dist_val = c["dist"] if not np.isnan(c["dist"]) else -9999
 
-                # Bubble pass detection: allow a car to move up only if it clearly passed the one ahead
-                swapped = True
-                while swapped:
-                    swapped = False
-                    for idx in range(len(active_codes) - 1):
-                        if idx < len(sorted_codes) - 1:
-                            a = sorted_codes[idx]
-                            b = sorted_codes[idx + 1]
+            return (pos_val, gap_val, -dist_val)
 
-                            # Skip if either is in out_codes (retired)
-                            if a not in active_codes or b not in active_codes:
-                                continue
+        sorted_codes = sorted(active_codes, key=sort_key) + out_codes
 
-                            pa = frame_data_raw[a]["race_progress"]
-                            pb = frame_data_raw[b]["race_progress"]
-
-                            # If b is clearly ahead of a (by more than PASS_MARGIN), swap (overtake detected)
-                            if pb > pa + PASS_MARGIN:
-                                sorted_codes[idx], sorted_codes[idx + 1] = b, a
-                                swapped = True
+        # STEP 7: Debug print to confirm FIA timing-based sorting
+        if i in [0, 50, 200]:
+            top5 = [(code, frame_data_raw[code]['pos_raw'], frame_data_raw[code].get('gap', '?')) for code in sorted_codes[:5]]
+            _debug_log(f"t={t_abs:.2f}: {top5}")
 
         # Calculate positions and gaps for this frame
         frame_data = {}
-        for code in sorted_codes:
+        for pos, code in enumerate(sorted_codes, start=1):
             frame_data[code] = frame_data_raw[code].copy()
-            # Only give race positions to active drivers
-            if code in active_codes:
-                frame_data[code]["position"] = active_codes.index(code) + 1
-            else:
-                # OUT drivers get positions after all active drivers
-                frame_data[code]["position"] = len(active_codes) + out_codes.index(code) + 1
+            frame_data[code]["position"] = pos
 
         # DEBUG: Log all driver data at key frames
         if i in [0, 50, 100, 200, 300, 400, 500, 600, 700]:
