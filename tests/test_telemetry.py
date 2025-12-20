@@ -476,3 +476,18 @@ def test_check_timing_coverage_empty():
 
     assert has_good == False
     assert coverage == 0.0
+
+
+def test_sort_key_hybrid_none_pos_raw():
+    """Test that None pos_raw is handled without TypeError (regression test)"""
+    frame_data_raw = {
+        'HAM': {'pos_raw': None, 'interval_smooth': 0.5, 'race_progress': 1000.0},
+        'VER': {'pos_raw': 2, 'interval_smooth': 1.2, 'race_progress': 950.0},
+    }
+
+    key_ham = sort_key_hybrid('HAM', frame_data_raw)
+    key_ver = sort_key_hybrid('VER', frame_data_raw)
+
+    assert key_ham == (9999, 0.5, -1000.0)
+    assert key_ver == (2, 1.2, -950.0)
+    assert key_ver < key_ham

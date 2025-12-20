@@ -347,8 +347,8 @@ def sort_key_hybrid(code: str, frame_data_raw: dict) -> tuple:
 
     data = frame_data_raw[code]
 
-    pos_raw = data.get('pos_raw', 0)
-    pos_val = pos_raw if pos_raw > 0 else 9999
+    pos_raw = data.get('pos_raw', None)
+    pos_val = pos_raw if (pos_raw is not None and pos_raw > 0) else 9999
 
     interval_smooth = data.get('interval_smooth')
     interval_val = interval_smooth if interval_smooth is not None else 9999
