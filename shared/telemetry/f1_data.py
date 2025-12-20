@@ -810,6 +810,9 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     total_race_distance = circuit_length * max_lap_number
     FINISH_EPSILON = min(0.01 * circuit_length, 50.0)  # 1% of circuit or 50m, whichever is tighter
 
+    # Initialize hysteresis smoother (Tier 3)
+    position_smoother = PositionSmoothing()
+
     for i in range(num_frames):
         t = timeline[i]
         t_abs = t + global_t_min  # Convert to absolute session seconds for race-start comparison
@@ -904,9 +907,31 @@ def get_race_telemetry(session, session_type='R', refresh=False):
         if not race_finished and current_leader and leader_progress >= (total_race_distance - FINISH_EPSILON) and final_positions:
             race_finished = True
 
+        # Get current track status for hysteresis threshold
+        current_track_status = '1'  # Default to Green
+        try:
+            for status_record in formatted_track_statuses:
+                start = status_record.get('start_time', 0)
+                end = status_record.get('end_time')
+                if end is None:
+                    end = float('inf')
+                if start <= t_abs <= end:
+                    current_track_status = status_record.get('status', '1')
+                    break
+        except Exception:
+            current_track_status = '1'
+
         # STEP 4: HYBRID SORTING (Phase 2, Task 2.2)
         # Use 3-tier sorting: pos_raw (Tier 1), interval_smooth (Tier 1.5), race_progress (Tier 2)
         sorted_codes = sorted(active_codes, key=lambda code: sort_key_hybrid(code, frame_data_raw)) + out_codes
+
+        # Apply hysteresis smoothing (Tier 3)
+        sorted_codes = position_smoother.apply(
+            sorted_codes,
+            frame_data_raw,
+            t_abs,
+            current_track_status
+        )
 
         # STEP 7: Debug print to confirm FIA timing-based sorting
         if i in [0, 50, 200]:
