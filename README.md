@@ -115,9 +115,9 @@ npm run dev -- --no-open
 
 ## 📚 Documentation
 
-- **[CLAUDE.md](./CLAUDE.md)** – Comprehensive development guide with architecture, data structures, and API details
-- **[roadmap.md](./roadmap.md)** – Planned features and development roadmap
-- **[docs/](./docs/)** – Additional documentation and troubleshooting guides
+- **[docs/ROADMAP.md](./docs/ROADMAP.md)** – Planned features and development roadmap
+- **[docs/](./docs/)** – Architecture guides, troubleshooting, and additional documentation
+- **CLAUDE.md** – Internal development guide (for contributors)
 
 ## 🏗 Architecture
 
@@ -159,7 +159,7 @@ See [Issues](https://github.com/jamesadams90/f1-race-replay/issues) for the full
 We welcome contributions! Here's how to get started:
 
 1. **Fork the repository** and create your feature branch (`git checkout -b feature/amazing-feature`)
-2. **Follow the development guidelines** in [CLAUDE.md](./CLAUDE.md)
+2. **Follow the development guidelines** in CLAUDE.md
 3. **Test your changes** thoroughly
 4. **Commit with clear messages** describing your changes
 5. **Push to your branch** and open a Pull Request
@@ -171,7 +171,7 @@ We welcome contributions! Here's how to get started:
 - **Documentation:** Update docs for new features
 - **No Claude attribution:** Keep commit messages focused on changes only
 
-See the [roadmap.md](./roadmap.md) for planned features and areas where help is needed.
+See [docs/ROADMAP.md](./docs/ROADMAP.md) for planned features and areas where help is needed.
 
 ## 📊 Performance Notes
 
@@ -203,7 +203,7 @@ Formula 1 and related trademarks are property of their respective owners. This p
 
 ## 🙋 Support
 
-- **Questions?** Check out the [documentation](./CLAUDE.md) and [roadmap](./roadmap.md)
+- **Questions?** Check out the [documentation](./docs/) and [roadmap](./docs/ROADMAP.md)
 - **Found a bug?** [Open an issue](https://github.com/jamesadams90/f1-race-replay/issues)
 - **Want to discuss?** Discussions welcome in the issues section
 

@@ -320,10 +320,8 @@ cd frontend && npm run build
 - Session types: `'R'` (Race), `'S'` (Sprint), `'Q'` (Qualifying), `'SQ'` (Sprint Qualifying)
 - Not all events have sprint sessions
 
-## Project Vision (from roadmap.md)
+## Project Vision
 
-This project aims to be the best way for data-loving F1 fans to explore race weekend data:
-- **GUI Menu System** (planned): Navigate sessions and data views
-- **Qualifying & Practice** (in development): Full session replay support
-- **Lap Telemetry Analysis** (in development): Speed traces and performance analysis
-- **Comparison Tools** (planned): Side-by-side driver/lap comparisons
+This project aims to be the best way for data-loving F1 fans to explore race weekend data with immersive 3D visualization and detailed telemetry analysis.
+
+For detailed roadmap and planned features, see [docs/ROADMAP.md](docs/ROADMAP.md)
