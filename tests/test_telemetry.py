@@ -119,3 +119,158 @@ def test_sort_key_hybrid_tuple_ordering():
 
     sorted_drivers = sorted(drivers, key=lambda c: sort_key_hybrid(c, frame_data_raw))
     assert sorted_drivers == ['P1', 'P2', 'P3']
+
+
+from shared.telemetry.f1_data import PositionSmoothing
+
+
+def test_position_smoothing_initial_state():
+    """Test that first call returns same order unchanged"""
+    smoother = PositionSmoothing()
+    frame_data_raw = {
+        'HAM': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'VER': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'SAI': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+    }
+
+    sorted_codes = ['HAM', 'VER', 'SAI']
+    result = smoother.apply(sorted_codes, frame_data_raw, 0.0, '1')
+
+    assert result == ['HAM', 'VER', 'SAI']
+
+
+def test_position_smoothing_no_change():
+    """Test that same order returns same order"""
+    smoother = PositionSmoothing()
+    frame_data_raw = {
+        'HAM': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'VER': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'SAI': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+    }
+
+    sorted_codes = ['HAM', 'VER', 'SAI']
+    smoother.apply(sorted_codes, frame_data_raw, 0.0, '1')
+
+    result = smoother.apply(sorted_codes, frame_data_raw, 0.5, '1')
+
+    assert result == ['HAM', 'VER', 'SAI']
+
+
+def test_position_smoothing_change_too_fast():
+    """Test that new order is rejected if less than threshold time has passed"""
+    smoother = PositionSmoothing()
+    frame_data_raw_1 = {
+        'HAM': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'VER': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'SAI': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+    }
+
+    sorted_codes_1 = ['HAM', 'VER', 'SAI']
+    smoother.apply(sorted_codes_1, frame_data_raw_1, 0.0, '1')
+
+    frame_data_raw_2 = {
+        'VER': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'HAM': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'SAI': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+    }
+
+    sorted_codes_2 = ['VER', 'HAM', 'SAI']
+    result = smoother.apply(sorted_codes_2, frame_data_raw_2, 0.5, '1')
+
+    assert result == ['HAM', 'VER', 'SAI']
+
+
+def test_position_smoothing_change_with_threshold():
+    """Test that new order is accepted after hysteresis threshold passes"""
+    smoother = PositionSmoothing()
+    frame_data_raw_1 = {
+        'HAM': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'VER': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'SAI': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+    }
+
+    sorted_codes_1 = ['HAM', 'VER', 'SAI']
+    smoother.apply(sorted_codes_1, frame_data_raw_1, 0.0, '1')
+
+    frame_data_raw_2 = {
+        'VER': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'HAM': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'SAI': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+    }
+
+    sorted_codes_2 = ['VER', 'HAM', 'SAI']
+    result = smoother.apply(sorted_codes_2, frame_data_raw_2, 1.5, '1')
+
+    assert result == ['VER', 'HAM', 'SAI']
+
+
+def test_position_smoothing_track_status_safety_car():
+    """Test that SC/VSC reduces hysteresis threshold to 0.3s"""
+    smoother = PositionSmoothing()
+    frame_data_raw_1 = {
+        'HAM': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'VER': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'SAI': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+    }
+
+    sorted_codes_1 = ['HAM', 'VER', 'SAI']
+    smoother.apply(sorted_codes_1, frame_data_raw_1, 0.0, '1')
+
+    frame_data_raw_2 = {
+        'VER': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'HAM': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'SAI': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+    }
+
+    sorted_codes_2 = ['VER', 'HAM', 'SAI']
+    result = smoother.apply(sorted_codes_2, frame_data_raw_2, 0.35, '4')
+
+    assert result == ['VER', 'HAM', 'SAI']
+
+
+def test_position_smoothing_track_status_vsc():
+    """Test that VSC (6/7) reduces hysteresis threshold to 0.3s"""
+    smoother = PositionSmoothing()
+    frame_data_raw_1 = {
+        'HAM': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'VER': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+    }
+
+    sorted_codes_1 = ['HAM', 'VER']
+    smoother.apply(sorted_codes_1, frame_data_raw_1, 0.0, '1')
+
+    frame_data_raw_2 = {
+        'VER': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'HAM': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+    }
+
+    sorted_codes_2 = ['VER', 'HAM']
+    result = smoother.apply(sorted_codes_2, frame_data_raw_2, 0.25, '6')
+
+    assert result == ['HAM', 'VER']
+
+
+def test_position_smoothing_multiple_driver_changes():
+    """Test that multiple drivers can change in different frames"""
+    smoother = PositionSmoothing()
+    frame_data_raw_1 = {
+        'HAM': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'VER': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'SAI': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+        'ALO': {'race_progress': 850.0, 'pos_raw': 4, 'interval_smooth': 3.0},
+    }
+
+    sorted_codes_1 = ['HAM', 'VER', 'SAI', 'ALO']
+    smoother.apply(sorted_codes_1, frame_data_raw_1, 0.0, '1')
+
+    frame_data_raw_2 = {
+        'VER': {'race_progress': 1000.0, 'pos_raw': 1, 'interval_smooth': 0.5},
+        'HAM': {'race_progress': 950.0, 'pos_raw': 2, 'interval_smooth': 1.2},
+        'ALO': {'race_progress': 900.0, 'pos_raw': 3, 'interval_smooth': 2.1},
+        'SAI': {'race_progress': 850.0, 'pos_raw': 4, 'interval_smooth': 3.0},
+    }
+
+    sorted_codes_2 = ['VER', 'HAM', 'ALO', 'SAI']
+    result = smoother.apply(sorted_codes_2, frame_data_raw_2, 1.5, '1')
+
+    assert result == ['VER', 'HAM', 'ALO', 'SAI']

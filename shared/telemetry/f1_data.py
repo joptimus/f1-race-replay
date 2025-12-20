@@ -359,6 +359,78 @@ def sort_key_hybrid(code: str, frame_data_raw: dict) -> tuple:
     return (pos_val, interval_val, -race_progress_val)
 
 
+class PositionSmoothing:
+    """
+    Prevent position oscillations using time-based hysteresis.
+
+    Tier 3 of 4-tier leaderboard positioning hierarchy.
+    Applies hysteresis-based smoothing to prevent single-frame position flickers.
+    """
+
+    def __init__(self) -> None:
+        """Initialize empty previous order and last change times."""
+        self.previous_order: list[str] = []
+        self.last_change_time: dict[int, float] = {}
+
+    def _get_threshold(self, track_status: str) -> float:
+        """
+        Return hysteresis threshold based on track status.
+
+        Args:
+            track_status: FastF1 track status code
+
+        Returns:
+            Hysteresis threshold in seconds
+        """
+        if track_status in ['4', '6', '7']:
+            return 0.3
+        else:
+            return 1.0
+
+    def apply(
+        self,
+        sorted_codes: list[str],
+        frame_data_raw: dict,
+        current_time: float,
+        track_status: str
+    ) -> list[str]:
+        """
+        Apply hysteresis smoothing to position order.
+
+        Args:
+            sorted_codes: Current driver order from sort_key_hybrid
+            frame_data_raw: Driver data with race_progress, pos_raw, etc.
+            current_time: Current time in seconds from race start
+            track_status: Track status code ('1'=Green, '4'=SC, '6'/'7'=VSC, etc.)
+
+        Returns:
+            Smoothed driver order with hysteresis applied
+        """
+        if not self.previous_order:
+            self.previous_order = sorted_codes.copy()
+            return sorted_codes
+
+        hysteresis_threshold = self._get_threshold(track_status)
+        smoothed_order: list[str] = []
+
+        for position_idx, current_driver in enumerate(sorted_codes):
+            previous_driver = self.previous_order[position_idx] if position_idx < len(self.previous_order) else None
+
+            if current_driver != previous_driver:
+                time_since_last_change = current_time - self.last_change_time.get(position_idx, 0.0)
+
+                if time_since_last_change >= hysteresis_threshold:
+                    smoothed_order.append(current_driver)
+                    self.last_change_time[position_idx] = current_time
+                else:
+                    smoothed_order.append(previous_driver)
+            else:
+                smoothed_order.append(current_driver)
+
+        self.previous_order = smoothed_order.copy()
+        return smoothed_order
+
+
 def load_session(year, round_number, session_type='R'):
     # session_type: 'R' (Race), 'S' (Sprint) etc.
     session = fastf1.get_session(year, round_number, session_type)
