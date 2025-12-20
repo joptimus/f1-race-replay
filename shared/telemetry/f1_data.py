@@ -12,6 +12,10 @@ from pathlib import Path
 
 from shared.lib.tyres import get_tyre_compound_int
 from shared.lib.time import parse_time_string, format_time
+from shared.telemetry.fastf1_adapter import (
+    get_stream_timing,
+    get_track_status,
+)
 
 import pandas as pd
 
@@ -342,8 +346,8 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     timing_gap_df = None
     timing_pos_df = None
     try:
-        timing = session.timing_data.reset_index()
-        timing_gap_df = timing.pivot(index="Date", columns="Driver", values="GapToLeader")
+        timing = get_stream_timing(session).reset_index()
+        timing_gap_df = timing.pivot(index="Date", columns="Driver", values="GapToLeader_s")
         timing_pos_df = timing.pivot(index="Date", columns="Driver", values="Position")
 
         base_time = timing_gap_df.index[0]
@@ -481,7 +485,7 @@ def get_race_telemetry(session, session_type='R', refresh=False):
 
     # 4. Incorporate track status data into the timeline (for safety car, VSC, etc.)
 
-    track_status = session.track_status
+    track_status = get_track_status(session)
 
     formatted_track_statuses = []
     race_start_time = None
@@ -979,7 +983,7 @@ def get_driver_quali_telemetry(session, driver_code: str, quali_segment: str):
         "drs": drs_resampled,
     }
 
-    track_status = session.track_status
+    track_status = get_track_status(session)
 
     formatted_track_statuses = []
 
