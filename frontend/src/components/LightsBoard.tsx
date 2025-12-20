@@ -65,40 +65,12 @@ const LightsBoardComponent = ({ onSequenceComplete }: LightsBoardProps, ref: Rea
               padding: '48px 64px',
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
               minWidth: '400px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
             }}
             className={`transition-opacity duration-700 ease-out ${fadeOutClass}`}
           >
-            {/* Skip button */}
-            {canSkip && (
-              <button
-                onClick={skipSequence}
-                style={{
-                  position: 'absolute',
-                  bottom: '8px',
-                  right: '24px',
-                  background: '#e10600',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '4px',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = '#c70000';
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(225, 6, 0, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = '#e10600';
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
-                }}
-              >
-                Skip
-              </button>
-            )}
-
             {/* Lights container */}
             <div style={{ display: 'flex', gap: '24px', justifyContent: 'center' }}>
               {lightsOn.map((isLit, idx) => (
@@ -115,6 +87,36 @@ const LightsBoardComponent = ({ onSequenceComplete }: LightsBoardProps, ref: Rea
                 />
               ))}
             </div>
+
+            {/* Skip button row */}
+            {canSkip && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={skipSequence}
+                  style={{
+                    background: '#e10600',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#c70000';
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(225, 6, 0, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#e10600';
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
+                  }}
+                >
+                  Skip
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
