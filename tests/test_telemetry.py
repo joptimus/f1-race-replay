@@ -274,3 +274,130 @@ def test_position_smoothing_multiple_driver_changes():
     result = smoother.apply(sorted_codes_2, frame_data_raw_2, 1.5, '1')
 
     assert result == ['VER', 'HAM', 'ALO', 'SAI']
+
+
+from shared.telemetry.f1_data import _apply_lap_anchor
+
+
+def test_apply_lap_anchor_no_anchors():
+    """Test that order is unchanged when no lap boundaries exist"""
+    sorted_codes = ['HAM', 'VER', 'SAI']
+    frame_data_raw = {
+        'HAM': {'lap': 5},
+        'VER': {'lap': 5},
+        'SAI': {'lap': 5},
+    }
+    lap_boundaries = {}
+
+    result = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
+    assert result == ['HAM', 'VER', 'SAI']
+
+
+def test_apply_lap_anchor_partial_anchors():
+    """Test partial anchors - some drivers snap to official position, others use current order"""
+    sorted_codes = ['HAM', 'VER', 'SAI']
+    frame_data_raw = {
+        'HAM': {'lap': 5},
+        'VER': {'lap': 5},
+        'SAI': {'lap': 5},
+    }
+    lap_boundaries = {
+        'HAM': {5: 2},
+        'VER': {5: 1},
+    }
+
+    result = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
+    assert result == ['VER', 'HAM', 'SAI']
+
+
+def test_apply_lap_anchor_all_drivers_anchored():
+    """Test all drivers anchored at lap boundary"""
+    sorted_codes = ['HAM', 'VER', 'SAI']
+    frame_data_raw = {
+        'HAM': {'lap': 10},
+        'VER': {'lap': 10},
+        'SAI': {'lap': 10},
+    }
+    lap_boundaries = {
+        'HAM': {10: 3},
+        'VER': {10: 1},
+        'SAI': {10: 2},
+    }
+
+    result = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
+    assert result == ['VER', 'SAI', 'HAM']
+
+
+def test_apply_lap_anchor_multiple_laps():
+    """Test correct lap number used for lookups"""
+    sorted_codes = ['HAM', 'VER', 'SAI', 'ALO']
+    frame_data_raw = {
+        'HAM': {'lap': 15},
+        'VER': {'lap': 15},
+        'SAI': {'lap': 14},
+        'ALO': {'lap': 14},
+    }
+    lap_boundaries = {
+        'HAM': {14: 2, 15: 2},
+        'VER': {14: 1, 15: 1},
+        'SAI': {14: 4},
+        'ALO': {14: 3},
+    }
+
+    result = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
+    assert result == ['VER', 'HAM', 'ALO', 'SAI']
+
+
+def test_apply_lap_anchor_missing_lap_boundary():
+    """Test driver not in lap_boundaries uses fallback (current order)"""
+    sorted_codes = ['HAM', 'VER', 'SAI']
+    frame_data_raw = {
+        'HAM': {'lap': 8},
+        'VER': {'lap': 8},
+        'SAI': {'lap': 8},
+    }
+    lap_boundaries = {
+        'HAM': {8: 2},
+        'VER': {8: 1},
+    }
+
+    result = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
+    assert result == ['VER', 'HAM', 'SAI']
+
+
+def test_apply_lap_anchor_tier_0_priority():
+    """Test Tier 0 (lap anchors) takes priority over Tier 3 (current order)"""
+    sorted_codes = ['HAM', 'VER', 'SAI']
+    frame_data_raw = {
+        'HAM': {'lap': 25},
+        'VER': {'lap': 25},
+        'SAI': {'lap': 25},
+    }
+    lap_boundaries = {
+        'HAM': {25: 1},
+        'VER': {25: 3},
+        'SAI': {25: 2},
+    }
+
+    result = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
+    assert result == ['HAM', 'SAI', 'VER']
+
+
+def test_apply_lap_anchor_empty_sorted_codes():
+    """Test empty input returns empty output"""
+    sorted_codes = []
+    frame_data_raw = {}
+    lap_boundaries = {}
+
+    result = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
+    assert result == []
+
+
+def test_apply_lap_anchor_single_driver():
+    """Test single driver returns unchanged"""
+    sorted_codes = ['HAM']
+    frame_data_raw = {'HAM': {'lap': 5}}
+    lap_boundaries = {'HAM': {5: 1}}
+
+    result = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
+    assert result == ['HAM']

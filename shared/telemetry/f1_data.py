@@ -431,6 +431,59 @@ class PositionSmoothing:
         return smoothed_order
 
 
+def _apply_lap_anchor(
+    sorted_codes: list[str],
+    frame_data_raw: dict,
+    lap_boundaries: dict
+) -> list[str]:
+    """
+    Validate leaderboard against Tier 0 lap anchors.
+
+    Tier 0 (Legal Truth): Session.laps.Position - official position at lap completion
+
+    If a driver has just completed a lap, snap them to their official position.
+    This prevents long-term drift if Tier 1-2 data diverges from reality.
+
+    Args:
+        sorted_codes: Current driver order from hysteresis smoother (Tier 3)
+        frame_data_raw: Driver data including current lap number
+        lap_boundaries: Dict mapping driver_code -> dict of {lap_num: official_position}
+                       Pre-computed during telemetry processing
+
+    Returns:
+        Lap-anchored driver order (snapped to official positions at lap boundaries)
+    """
+    if not sorted_codes:
+        return sorted_codes
+
+    lap_snap_corrections = {}
+
+    for code in sorted_codes:
+        current_lap = frame_data_raw.get(code, {}).get("lap")
+
+        if (code in lap_boundaries and
+            current_lap is not None and
+            current_lap in lap_boundaries[code]):
+            official_position = lap_boundaries[code][current_lap]
+            lap_snap_corrections[code] = official_position
+        else:
+            lap_snap_corrections[code] = None
+
+    has_anchors = any(snap is not None for snap in lap_snap_corrections.values())
+
+    if not has_anchors:
+        return sorted_codes
+
+    def snap_sort_key(code: str) -> tuple:
+        if lap_snap_corrections[code] is not None:
+            return (0, lap_snap_corrections[code])
+        else:
+            return (1, sorted_codes.index(code))
+
+    sorted_codes = sorted(sorted_codes, key=snap_sort_key)
+    return sorted_codes
+
+
 def load_session(year, round_number, session_type='R'):
     # session_type: 'R' (Race), 'S' (Sprint) etc.
     session = fastf1.get_session(year, round_number, session_type)
