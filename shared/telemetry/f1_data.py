@@ -484,6 +484,31 @@ def _apply_lap_anchor(
     return sorted_codes
 
 
+def _check_timing_data_coverage(stream_data: pd.DataFrame, required_coverage: float = 0.8) -> tuple[bool, float]:
+    """
+    Check timing data completeness (for diagnostics only, not behavior control).
+
+    Args:
+        stream_data: DataFrame from get_stream_timing()
+        required_coverage: Minimum valid cells / total cells (default 0.8 = 80%)
+
+    Returns:
+        tuple: (has_good_coverage: bool, coverage_ratio: float)
+    """
+    if stream_data is None or stream_data.empty:
+        return False, 0.0
+
+    total_cells = len(stream_data)
+    valid_cells = stream_data['Position'].notna().sum()
+
+    if total_cells == 0:
+        return False, 0.0
+
+    coverage = valid_cells / total_cells
+
+    return coverage >= required_coverage, coverage
+
+
 def load_session(year, round_number, session_type='R'):
     # session_type: 'R' (Race), 'S' (Sprint) etc.
     session = fastf1.get_session(year, round_number, session_type)

@@ -434,3 +434,45 @@ def test_detect_retirement_missing_data():
     }
 
     assert _detect_retirement('HAM', frame_data_raw) == False
+
+
+def test_check_timing_coverage_good():
+    """Test that good coverage is detected"""
+    from shared.telemetry.f1_data import _check_timing_data_coverage
+
+    stream_data = pd.DataFrame({
+        'Driver': ['HAM', 'HAM', 'HAM', 'VER', 'VER', 'VER'],
+        'Position': [1, 1, 1, 2, 2, 2],
+    })
+
+    has_good, coverage = _check_timing_data_coverage(stream_data, required_coverage=0.8)
+
+    assert has_good == True
+    assert coverage >= 0.8
+
+
+def test_check_timing_coverage_poor():
+    """Test that poor coverage is detected"""
+    from shared.telemetry.f1_data import _check_timing_data_coverage
+
+    stream_data = pd.DataFrame({
+        'Driver': ['HAM', 'HAM', 'HAM', 'VER', 'VER', 'VER'],
+        'Position': [1, np.nan, np.nan, 2, np.nan, np.nan],
+    })
+
+    has_good, coverage = _check_timing_data_coverage(stream_data, required_coverage=0.8)
+
+    assert has_good == False
+    assert coverage < 0.8
+
+
+def test_check_timing_coverage_empty():
+    """Test that empty data is handled"""
+    from shared.telemetry.f1_data import _check_timing_data_coverage
+
+    stream_data = pd.DataFrame({'Position': []})
+
+    has_good, coverage = _check_timing_data_coverage(stream_data)
+
+    assert has_good == False
+    assert coverage == 0.0
