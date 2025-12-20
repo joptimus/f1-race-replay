@@ -153,7 +153,96 @@ We're implementing a **4-tier hierarchy** with **continuous-signal smoothing**:
   ```
   - Always prefer `stream_data.Position` during pit stops over distance-based order
 
-### 1.4 Race Start Alignment
+### 1.4 Track Status Awareness (SC/VSC/Red Flag)
+
+**Critical**: Position smoothing must be disabled during safety car periods.
+
+**Access method**:
+```python
+track_status = fastf1.api.track_status_data(session.api_path)
+# Returns DataFrame with columns: Time, Status (str), Message (str)
+# Status codes:
+#   '1' = AllClear/Green
+#   '4' = Safety Car
+#   '6' = Virtual Safety Car
+#   '7' = Red Flag
+```
+
+**Integration points**:
+- **Disable hysteresis** during SC/VSC/Red (Status in ['4','6','7'])
+- **Use stream Position directly** (no smoothing artifacts)
+- **Reset hysteresis state** when track status changes
+- **Allow immediate position updates** for actual overtakes
+
+**Code pattern**:
+```python
+track_status_df = fastf1.api.track_status_data(session.api_path)
+
+# Resample to animation timeline
+track_status_resampled = track_status_df.set_index('Time').reindex(abs_timeline, method='ffill')
+current_status = track_status_resampled.loc[t_abs, 'Status']
+
+# In frame loop:
+if current_status in ['4', '6', '7']:  # SC/VSC/Red
+    position_smoother.disable()  # Or skip hysteresis application
+else:
+    position_smoother.enable()
+```
+
+### 1.5 Data Stream Resampling Alignment
+
+**Critical**: pos_data (X/Y coordinates) and stream_data (gaps/positions) sample at different rates and times.
+
+**Problem**:
+- `pos_data` from GPS ~100 Hz (X, Y, Z coordinates)
+- `stream_data` from FIA ~4 Hz (Position, gaps, timing)
+- Direct merge causes misalignment → race_progress doesn't sync with gaps
+
+**Solution**: Resample to common timebase before merging:
+
+```python
+def align_position_and_timing(session, target_freq='250ms'):
+    """
+    Align pos_data (X/Y) with stream_data (gaps/positions).
+
+    Returns:
+        dict mapping driver_num -> aligned DataFrame with both streams
+    """
+    aligned_data = {}
+    stream_data = get_stream_timing(session)  # Use adapter
+
+    for driver_num in session.drivers:
+        # Get position data (X, Y, Z from GPS)
+        pos_df = session.pos_data.get(driver_num, None)
+        if pos_df is None or pos_df.empty:
+            continue
+
+        # Get timing data for this driver (Position, gaps)
+        driver_code = session.get_driver(driver_num)["Abbreviation"]
+        stream_df = stream_data[stream_data["Driver"] == driver_code]
+
+        if stream_df.empty:
+            continue
+
+        # Resample both to common frequency (250ms = 4 Hz)
+        pos_resampled = pos_df.set_index('Time').resample(target_freq).interpolate()
+        stream_resampled = stream_df.set_index('Time').resample(target_freq).ffill()
+
+        # Merge on aligned timestamps
+        aligned = pd.merge(
+            pos_resampled,
+            stream_resampled,
+            left_index=True,
+            right_index=True,
+            how='inner'
+        )
+
+        aligned_data[driver_num] = aligned
+
+    return aligned_data
+```
+
+### 1.6 Race Start Alignment
 
 **Critical Issue**: Timing data and telemetry data have different time references.
 - **Telemetry time**: Seconds from first data point (varies by driver)
@@ -216,7 +305,84 @@ if timing_gap_df is not None and timing_pos_df is not None:
 
 ---
 
-## 3. Proposed Solution: 4-Tier Hierarchy Implementation
+## 3. API Isolation Layer (Phase 0 – Foundation)
+
+**Critical**: FastF1 marks `fastf1.api` as "will be private." Create adapters to isolate changes.
+
+**New file**: `shared/telemetry/fastf1_adapter.py`
+
+```python
+"""
+Adapter layer for FastF1 API calls.
+
+Isolates FastF1 API usage to enable future upgrades without code changes.
+All timedelta conversion happens here (once, not per-frame).
+"""
+
+import fastf1
+import pandas as pd
+
+def get_stream_timing(session):
+    """
+    Adapter: Get stream-level timing data (FIA tower updates ~240ms).
+
+    Returns:
+        DataFrame with columns: Time, Driver, Position, GapToLeader, IntervalToPositionAhead
+    """
+    laps_data, stream_data = fastf1.api.timing_data(session.api_path)
+
+    # Convert Timedelta → seconds ONCE (not per-frame)
+    stream_data["GapToLeader_s"] = stream_data["GapToLeader"].dt.total_seconds()
+    stream_data["Interval_s"] = stream_data["IntervalToPositionAhead"].dt.total_seconds()
+
+    return stream_data
+
+
+def get_lap_timing(session):
+    """
+    Adapter: Get lap-level timing data with LapNumber.
+
+    Returns:
+        DataFrame with lap positions and timing info
+    """
+    return fastf1.api.timing_app_data(session.api_path)
+
+
+def get_track_status(session):
+    """
+    Adapter: Get track status (SC/VSC/Red Flag detection).
+
+    Returns:
+        DataFrame with columns: Time, Status (str), Message (str)
+        Status codes: '1'=Green, '4'=SC, '6'=VSC, '7'=Red
+    """
+    return fastf1.api.track_status_data(session.api_path)
+
+
+def get_position_data(session):
+    """
+    Adapter: Get GPS position data (X, Y, Z coordinates).
+
+    Returns:
+        dict mapping driver_num -> DataFrame with X, Y, Z, Time columns
+    """
+    return session.pos_data
+```
+
+**Integration**: Replace all FastF1 API calls in `f1_data.py` with adapter functions.
+
+```python
+# OLD (in f1_data.py):
+laps_data, stream_data = fastf1.api.timing_data(session.api_path)
+
+# NEW:
+from shared.telemetry.fastf1_adapter import get_stream_timing
+stream_data = get_stream_timing(session)
+```
+
+---
+
+## 4. Proposed Solution: 4-Tier Hierarchy Implementation
 
 ### 3.1 Tier 0 Integration: Lap Anchor Validation
 
@@ -387,42 +553,68 @@ print(f"Applied Savitzky-Golay smoothing to IntervalToPositionAhead data")
 - Only smooth continuous signals → derive positions by sorting
 - Never smooth integer positions directly (creates garbage)
 
-### 3.4 Position Hysteresis (Final UI Layer)
+### 3.4 Position Hysteresis (Final UI Layer – TIME-BASED)
 
 **Add new class** before `get_race_telemetry()`:
 
-```python
-class PositionSmoothing:
-    """Prevent single-frame position oscillations that aren't physically meaningful"""
+**CRITICAL FIX**: Use **TIME-BASED threshold** (not distance-based).
 
-    def __init__(self, hysteresis_threshold=5.0):
+Why distance fails:
+- At 300 km/h: 5m = 0.06s (allows jitter)
+- At 60 km/h: 5m = 0.3s (blocks real overtakes)
+
+```python
+from collections import defaultdict
+
+class PositionSmoothing:
+    """Prevent single-frame position oscillations (time-based, track-status aware)"""
+
+    def __init__(self, time_threshold_s=1.0):
         """
         Args:
-            hysteresis_threshold: Minimum gap (meters) required to allow a position swap.
-                                 Default 5m is reasonable for 25 FPS (0.04s per frame).
+            time_threshold_s: Minimum time gap (seconds) to allow swap.
+                             1.0s is robust across all speeds.
         """
         self.previous_order = []
-        self.hysteresis_threshold = hysteresis_threshold
+        self.swap_candidates = defaultdict(int)  # Track confirmation count
+        self.time_threshold = time_threshold_s
+        self.enabled = True
+
+    def disable(self):
+        """Disable during SC/VSC/Red Flag (allow instant updates)"""
+        self.enabled = False
+        self.previous_order = []
+        self.swap_candidates.clear()
+
+    def enable(self):
+        """Re-enable after track clears"""
+        self.enabled = True
 
     def apply(self, sorted_codes, frame_data_raw):
         """
-        Smooth positions by preventing swaps unless gap difference is significant.
+        Smooth positions with 2-frame confirmation on time gaps.
 
         Args:
-            sorted_codes: Current frame's sorted driver order (from sort_key)
-            frame_data_raw: Current frame's raw data dict with race_progress values
+            sorted_codes: Current frame's sorted order (from sort_key_hybrid)
+            frame_data_raw: Raw data with interval_smooth values
 
         Returns:
-            Smoothed driver order, or original if no history yet
+            Smoothed driver order, or original if no history
         """
+        # If disabled (SC/VSC), return raw order and reset state
+        if not self.enabled:
+            self.previous_order = list(sorted_codes)
+            self.swap_candidates.clear()
+            return sorted_codes
+
         if not self.previous_order:
             self.previous_order = list(sorted_codes)
-            return self.previous_order
+            return sorted_codes
 
         smoothed_order = list(self.previous_order)
         current_order = list(sorted_codes)
 
-        # Try to keep drivers in previous positions unless gap warrants a swap
+        # Check each position for changes
         for i in range(len(current_order)):
             if i >= len(smoothed_order):
                 smoothed_order.append(current_order[i])
@@ -431,37 +623,62 @@ class PositionSmoothing:
             current_code = current_order[i]
             previous_code = smoothed_order[i]
 
-            # If same driver at this position, no change needed
+            # Same driver, no change needed
             if current_code == previous_code:
+                self.swap_candidates.pop((i, current_code), None)
                 continue
 
-            # Different driver at this position - check if gap is significant
-            current_progress = frame_data_raw[current_code]["race_progress"]
-            previous_progress = frame_data_raw[previous_code]["race_progress"]
-            gap_diff = abs(previous_progress - current_progress)
+            # Different driver - check TIME gap (not distance)
+            current_interval = frame_data_raw[current_code].get("interval_smooth", 9999)
+            previous_interval = frame_data_raw[previous_code].get("interval_smooth", 9999)
 
-            # Only swap if gap exceeds threshold
-            if gap_diff >= self.hysteresis_threshold:
-                smoothed_order[i] = current_code
-            # else: stick with previous frame's driver (noise rejection)
+            # Handle NaN/missing data
+            if current_interval is None or previous_interval is None:
+                current_interval = frame_data_raw[current_code].get("gap_smoothed", 9999)
+                previous_interval = frame_data_raw[previous_code].get("gap_smoothed", 9999)
+
+            gap_diff = abs(current_interval - previous_interval) if (
+                current_interval != 9999 and previous_interval != 9999
+            ) else 0
+
+            swap_key = (i, current_code)
+
+            # Time-based threshold check
+            if gap_diff >= self.time_threshold:
+                self.swap_candidates[swap_key] += 1
+                # Require 2-frame confirmation (prevents single-frame jitter)
+                if self.swap_candidates[swap_key] >= 2:
+                    smoothed_order[i] = current_code
+                    self.swap_candidates.pop(swap_key, None)
+            else:
+                # Gap below threshold, reset confirmation count
+                self.swap_candidates[swap_key] = 0
 
         self.previous_order = smoothed_order
         return smoothed_order
 ```
 
-**Integration point** (line 722):
+**Integration point** (in frame loop, after sorting):
 ```python
-# Current:
-sorted_codes = sorted(active_codes, key=sort_key) + out_codes
-
-# New:
 sorted_codes_raw = sorted(active_codes, key=sort_key_hybrid)
-sorted_codes = position_smoother.apply(sorted_codes_raw, frame_data_raw) + out_codes
+sorted_codes = position_smoother.apply(sorted_codes_raw, frame_data_raw)
 ```
 
-**Where to instantiate smoother** (in `get_race_telemetry()`, before frame loop):
+**Track status integration** (in frame loop):
 ```python
-position_smoother = PositionSmoothing(hysteresis_threshold=5.0)  # meters
+current_track_status = track_status_resampled.loc[t_abs, 'Status']
+
+if current_track_status in ['4', '6', '7']:  # SC/VSC/Red
+    position_smoother.disable()
+else:
+    position_smoother.enable()
+
+sorted_codes = position_smoother.apply(sorted_codes_raw, frame_data_raw)
+```
+
+**Where to instantiate** (before frame loop in `get_race_telemetry()`):
+```python
+position_smoother = PositionSmoothing(time_threshold_s=1.0)  # 1 second = robust threshold
 ```
 
 ### 3.5 Retirement Detection (Anti-Ghost-Overtake)
@@ -653,19 +870,57 @@ else:
 - [ ] Ensure retired drivers never re-enter active leaderboard
 - [ ] Test with known DNF/retirement sessions
 
-### Phase 6: Fallback & Error Handling
-- [ ] Add `_check_timing_data_coverage()` function
-- [ ] Warn if timing data < 80% available
-- [ ] Fall back to distance-based ordering if timing sparse
-- [ ] Log warnings clearly for debugging
+### Phase 6: Fallback & Error Handling (Per-Frame Logic)
+- [ ] **Remove session-wide coverage gates** (too coarse-grained)
+- [ ] Implement per-frame, per-driver fallback:
+  ```python
+  # For each driver in each frame:
+  if stream_data[driver].Position is NaN or None:
+      use race_progress  # Fallback for this driver only
+  else:
+      use stream_Position  # Primary (always prefer FIA data when available)
+  ```
+- [ ] Log diagnostic warnings: "Driver X using distance at frame Y (missing stream position)"
+- [ ] **Keep `_check_timing_data_coverage()` for diagnostics only** (logging, not behavior)
+- [ ] **Never disable timing globally** unless SessionNotAvailableError
+- [ ] Add logging level control (verbose/warning/error)
 
-### Phase 7: Testing & Validation
-- [ ] Test on early race (frames 0-100): no random reshuffles
-- [ ] Test on pit stops: smooth position loss/gain
-- [ ] Test on safety car periods: flicker prevention working
-- [ ] Test on DNF/retirements: no ghost overtakes
-- [ ] Test on qualifying/sprint: no regressions
-- [ ] Compare against official broadcast leaderboard at key moments
+### Phase 7: Testing & Validation (DETAILED)
+
+**Automated Unit Tests:**
+- [ ] Frame 0: Order matches grid positions (±1 for first-corner acceleration)
+- [ ] Frame 50: Smooth transition from grid (no random reshuffles)
+- [ ] Lap boundaries: Positions match Session.laps.Position (±0.5s)
+- [ ] Overtake detection: Single-frame position changes visible, no oscillation
+- [ ] DNF test: Retired drivers locked at bottom, never re-enter
+- [ ] Pit stop test: No "ghost overtakes" (car in pit shows ahead momentarily)
+- [ ] SC/VSC test: No position oscillations during safety car periods
+- [ ] Red flag test: Correct handling at race restart
+- [ ] Final classification: Order matches Session.results exactly
+- [ ] Resampling validation: pos_data (GPS) aligns with stream_data (gaps)
+- [ ] Adapter layer: All FastF1 calls go through `fastf1_adapter.py`
+- [ ] Fallback logging: Detect and log per-frame fallback events
+
+**Manual Validation (Real Races):**
+- [ ] 2024 Abu Dhabi GP: Complex SC restart with position changes
+- [ ] 2024 Monaco GP: Heavy traffic, multiple pit stops, no "ghosts"
+- [ ] 2024 Brazil Sprint: Rapid position changes, wet conditions
+- [ ] 2024 Silverstone: Long straight overtakes
+- [ ] Compare at 5 key race moments vs. official broadcast
+
+**Performance Benchmarks:**
+- [ ] Frame generation: <50ms per frame (target 25 FPS playback)
+- [ ] Memory usage: <500MB for full race (3000+ frames)
+- [ ] API adapter overhead: <5% vs. direct calls
+- [ ] Smoothing computation: <10ms per frame
+
+**Edge Cases:**
+- [ ] All 20 drivers on track
+- [ ] Drivers with missing telemetry (late start, warm-up lap)
+- [ ] Extreme pit loss (10+ position drop)
+- [ ] Late-race DSQ or penalties
+- [ ] Multiple retirements in quick succession
+- [ ] Multi-lap safety car period
 
 ---
 
