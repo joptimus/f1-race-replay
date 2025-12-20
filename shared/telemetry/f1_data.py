@@ -866,6 +866,15 @@ def get_race_telemetry(session, session_type='R', refresh=False):
     # Initialize hysteresis smoother (Tier 3)
     position_smoother = PositionSmoothing()
 
+    # Build lap_boundaries: map driver_code -> {lap_num: official_position}
+    # Used by _apply_lap_anchor for Tier 0 validation
+    lap_boundaries = {}
+    for code, lap_positions in driver_lap_positions.items():
+        lap_boundaries[code] = {}
+        for lap_idx, position in enumerate(lap_positions, start=1):
+            if position is not None:
+                lap_boundaries[code][lap_idx] = position
+
     for i in range(num_frames):
         t = timeline[i]
         t_abs = t + global_t_min  # Convert to absolute session seconds for race-start comparison
@@ -985,6 +994,9 @@ def get_race_telemetry(session, session_type='R', refresh=False):
             t_abs,
             current_track_status
         )
+
+        # Apply lap anchor validation (Tier 0)
+        sorted_codes = _apply_lap_anchor(sorted_codes, frame_data_raw, lap_boundaries)
 
         # STEP 7: Debug print to confirm FIA timing-based sorting
         if i in [0, 50, 200]:
