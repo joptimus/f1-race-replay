@@ -19,6 +19,7 @@ import { VerticalNavMenu } from "./components/VerticalNavMenu";
 import { motion } from "framer-motion";
 import { dataService } from "./services/dataService";
 import { preloadDriverImages, preloadTeamLogos, preloadTyreIcons, preloadCommonImages } from "./utils/imagePreloader";
+import { getDriverCountryFlagEmoji } from "./utils/countryFlags";
 
 
 const getImageExtension = (year: number, imageType: 'driver' | 'number' = 'driver'): string => {
@@ -35,12 +36,25 @@ const getImageExtension = (year: number, imageType: 'driver' | 'number' = 'drive
 
 const DriverImage = ({ year, code, ext }: { year: number; code: string; ext: string }) => {
   const [imageError, setImageError] = useState(false);
+  const [tryingFallback, setTryingFallback] = useState(false);
+
+  const handleError = () => {
+    if (!tryingFallback && ext !== 'png') {
+      setTryingFallback(true);
+    } else {
+      setImageError(true);
+    }
+  };
+
+  const imageSrc = imageError
+    ? '/images/drivers/PLACEHOLDER.png'
+    : `/images/drivers/${year}/${code.toUpperCase()}.${tryingFallback ? 'png' : ext}`;
 
   return (
     <img
-      src={imageError ? '/images/drivers/PLACEHOLDER.png' : `/images/drivers/${year}/${code.toUpperCase()}.${ext}`}
+      src={imageSrc}
       alt={code}
-      onError={() => setImageError(true)}
+      onError={handleError}
       style={{ width: '100%', height: '100%' }}
     />
   );
@@ -48,12 +62,25 @@ const DriverImage = ({ year, code, ext }: { year: number; code: string; ext: str
 
 const DriverNumberImage = ({ year, number, ext }: { year: number; number: string; ext: string }) => {
   const [imageError, setImageError] = useState(false);
+  const [tryingFallback, setTryingFallback] = useState(false);
+
+  const handleError = () => {
+    if (!tryingFallback && ext !== 'png') {
+      setTryingFallback(true);
+    } else {
+      setImageError(true);
+    }
+  };
+
+  const imageSrc = imageError
+    ? '/images/numbers/PLACEHOLDER.png'
+    : `/images/numbers/${year}/${number}.${tryingFallback ? 'png' : ext}`;
 
   return (
     <img
-      src={imageError ? '/images/numbers/PLACEHOLDER.png' : `/images/numbers/${year}/${number}.${ext}`}
+      src={imageSrc}
       alt={`Driver ${number}`}
-      onError={() => setImageError(true)}
+      onError={handleError}
       style={{
         height: '60px',
         width: '100%',
@@ -98,6 +125,10 @@ const DriverHero = ({ year }: { year?: number }) => {
   const driver = year ? dataService.getDriverByCode(year, code) : null;
   const driverNum = driver?.CarNumber || "0";
   const fullName = year ? dataService.getDriverFullName(year, code) : code;
+  const nameParts = fullName.split(' ');
+  const lastName = nameParts[nameParts.length - 1] || code;
+  const firstName = nameParts.slice(0, -1).join(' ') || code;
+  const countryFlag = driver?.Country ? getDriverCountryFlagEmoji(driver.Country) : '';
   const driverImgExt = getImageExtension(displayYear, 'driver');
   const numberImgExt = getImageExtension(displayYear, 'number');
 
@@ -120,9 +151,9 @@ const DriverHero = ({ year }: { year?: number }) => {
 
       {/* 2. TEXT CONTENT (Z-INDEX 10) */}
       <div className="f1-card-info">
-        <p className="f1-first-name">{fullName.split(' ')[0] || code}</p>
-        <p className="f1-last-name">{fullName.split(' ')[1] || code}</p>
-        <div className="f1-team-name">{code}</div>
+        <p className="f1-first-name">{firstName}</p>
+        <p className="f1-last-name">{lastName}</p>
+        <div className="f1-team-name">{code} {countryFlag}</div>
 
         {/* Number Image */}
         <DriverNumberImage year={displayYear} number={driverNum} ext={numberImgExt} />
