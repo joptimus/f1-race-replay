@@ -9,17 +9,22 @@ import { useReplayStore } from "../store/replayStore";
 const FPS = 25; // Frames per second
 
 export const usePlaybackAnimation = () => {
-  const { playback, setFrameIndex, pause } = useReplayStore((state) => ({
-    playback: state.playback,
-    setFrameIndex: state.setFrameIndex,
-    pause: state.pause,
+  const { isPlaying, speed, frameIndex, totalFrames } = useReplayStore((state) => ({
+    isPlaying: state.playback.isPlaying,
+    speed: state.playback.speed,
+    frameIndex: state.playback.frameIndex,
+    totalFrames: state.playback.totalFrames,
   }));
 
+  const setFrameIndex = useReplayStore((state) => state.setFrameIndex);
+  const pause = useReplayStore((state) => state.pause);
+
   const startTimeRef = useRef<number | null>(null);
+  const startFrameRef = useRef<number>(0);
   const rafIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!playback.isPlaying) {
+    if (!isPlaying) {
       startTimeRef.current = null;
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
@@ -28,9 +33,10 @@ export const usePlaybackAnimation = () => {
       return;
     }
 
-    // Initialize start time on first play
+    // Initialize start time and frame on first play
     if (startTimeRef.current === null) {
       startTimeRef.current = performance.now();
+      startFrameRef.current = frameIndex;
     }
 
     const animate = (currentTime: number) => {
@@ -39,13 +45,13 @@ export const usePlaybackAnimation = () => {
       // Calculate elapsed time in seconds
       const elapsedSeconds = (currentTime - startTimeRef.current) / 1000;
 
-      // Calculate new frame index: frameIndex + (elapsed * speed * FPS)
+      // Calculate new frame index: startFrame + (elapsed * speed * FPS)
       const newFrameIndex =
-        playback.frameIndex + elapsedSeconds * playback.speed * FPS;
+        startFrameRef.current + elapsedSeconds * speed * FPS;
 
-      if (newFrameIndex >= playback.totalFrames - 1) {
+      if (newFrameIndex >= totalFrames - 1) {
         // Reached end of race
-        setFrameIndex(playback.totalFrames - 1);
+        setFrameIndex(totalFrames - 1);
         pause();
       } else {
         setFrameIndex(Math.floor(newFrameIndex));
@@ -62,5 +68,5 @@ export const usePlaybackAnimation = () => {
         rafIdRef.current = null;
       }
     };
-  }, [playback.isPlaying, playback.frameIndex, playback.speed, playback.totalFrames, setFrameIndex, pause]);
+  }, [isPlaying, speed, totalFrames, setFrameIndex, pause]);
 };

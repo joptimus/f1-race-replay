@@ -122,7 +122,7 @@ export const Leaderboard: React.FC = () => {
         <h3 style={{ fontWeight: 900, textTransform: 'uppercase', color: '#e10600', fontSize: '0.75rem', margin: 0 }}>STANDINGS</h3>
         <div style={{ display: 'flex', gap: '16px', marginRight: '8px', alignItems: 'center' }}>
           <span className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af', width: '40px', textAlign: 'right' }}>GAP</span>
-          <span className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af', width: '40px', textAlign: 'right' }}>LEA</span>
+          <span className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af', width: '40px', textAlign: 'right' }}>LEADER</span>
           <span className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af', width: '24px', textAlign: 'center' }}>TYRE</span>
         </div>
       </div>
@@ -138,7 +138,7 @@ export const Leaderboard: React.FC = () => {
             const gap_to_leader = data.gap_to_leader || 0;
 
             const formatGap = (gapSeconds: number): string => {
-              if (gapSeconds === 0) return "LEADER";
+              if (gapSeconds === 0) return "-";
               return `+${gapSeconds.toFixed(3)}`;
             };
 

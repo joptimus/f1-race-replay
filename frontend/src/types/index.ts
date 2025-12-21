@@ -21,6 +21,8 @@ export interface DriverData {
   sector2?: number | null;
   sector3?: number | null;
   status?: string;
+  gap_to_previous?: number;
+  gap_to_leader?: number;
 }
 
 export interface FrameData {

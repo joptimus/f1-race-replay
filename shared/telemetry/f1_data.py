@@ -249,16 +249,19 @@ def _calculate_gaps(sorted_codes, frame_data):
         current_speed_ms = (data["speed"] * 1000) / 3600
 
         if idx > 0:
+            # Calculate gap to car ahead
             prev_code = sorted_codes[idx - 1]
             prev_data = frame_data[prev_code]
             dist_diff = prev_data["race_progress"] - data["race_progress"]
             if dist_diff > 0 and current_speed_ms > 0:
                 gap_to_previous = distance_to_time_gap(dist_diff, current_speed_ms)
 
+            # Calculate gap to leader (only for non-leader drivers)
             if leader_data:
                 dist_diff = leader_data["race_progress"] - data["race_progress"]
                 if dist_diff > 0 and current_speed_ms > 0:
                     gap_to_leader = distance_to_time_gap(dist_diff, current_speed_ms)
+        # else: leader has gap_to_previous = 0 and gap_to_leader = 0, which will display as "LEADER"
 
         gaps[code] = {
             "gap_to_previous": gap_to_previous,
@@ -583,7 +586,7 @@ def _detect_retirement(code: str, frame_data_raw: dict) -> bool:
 
     return False
 
-def get_race_telemetry(session, session_type='R', refresh=False):
+def get_race_telemetry(session, session_type='R', refresh=False, progress_callback=None):
 
     event_name = str(session).replace(' ', '_')
     cache_suffix = session_type.lower()
@@ -600,6 +603,8 @@ def get_race_telemetry(session, session_type='R', refresh=False):
                 frames = pickle.load(f)
                 print(f"Loaded precomputed {cache_suffix} telemetry data.")
                 print("The replay should begin in a new window shortly!")
+                if progress_callback:
+                    progress_callback(100.0)
                 return frames
     except FileNotFoundError:
         pass  # Need to compute from scratch
@@ -979,7 +984,13 @@ def get_race_telemetry(session, session_type='R', refresh=False):
 
     for i in range(num_frames):
         if i % 250 == 0:
-            print(f"[FRAMES] Processing frame {i}/{num_frames} ({100*i/num_frames:.1f}%)", flush=True)
+            progress_pct = 100*i/num_frames
+            print(f"[FRAMES] Processing frame {i}/{num_frames} ({progress_pct:.1f}%)", flush=True)
+            if progress_callback:
+                try:
+                    progress_callback(progress_pct)
+                except Exception as e:
+                    print(f"[FRAMES] Warning: Progress callback failed: {e}", flush=True)
 
         t = timeline[i]
         t_abs = t + global_t_min  # Convert to absolute session seconds for race-start comparison
@@ -1531,7 +1542,7 @@ def _process_quali_driver(args):
     }
 
 
-def get_quali_telemetry(session, session_type='Q', refresh=False):
+def get_quali_telemetry(session, session_type='Q', refresh=False, progress_callback=None):
     # This function is going to get the results from qualifying and the telemetry for each drivers' fastest laps in each qualifying segment
 
     # The structure of the returned data will be:
@@ -1561,6 +1572,8 @@ def get_quali_telemetry(session, session_type='Q', refresh=False):
                 data = pickle.load(f)
                 print(f"Loaded precomputed {cache_suffix} telemetry data.")
                 print("The replay should begin in a new window shortly!")
+                if progress_callback:
+                    progress_callback(100.0)
                 return data
     except FileNotFoundError:
         pass  # Need to compute from scratch
@@ -1582,6 +1595,8 @@ def get_quali_telemetry(session, session_type='Q', refresh=False):
     driver_args = [(session, driver_codes[driver_no]) for driver_no in session.drivers]
 
     print(f"Processing {len(session.drivers)} drivers in parallel...")
+    # Note: progress_callback is not used for qualifying as it uses multiprocessing
+    # and progress tracking across worker processes is complex to implement
 
     num_processes = min(cpu_count(), len(session.drivers))
 
