@@ -304,7 +304,7 @@ class LeaderboardDebugger {
    */
   exportReport(): string {
     const report = this.generateReport();
-    return JSON.stringify(report, (key, value) => {
+    return JSON.stringify(report, (_key, value) => {
       if (value instanceof Set) {
         return Array.from(value);
       }

@@ -1,4 +1,4 @@
-import { useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useLightsBoard } from '../hooks/useLightsBoard';
 
 interface LightsBoardProps {

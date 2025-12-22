@@ -45,10 +45,6 @@ export const SectorTimesTable: React.FC = () => {
     setExpandedTimes(newExpanded);
   };
 
-  const formatTime = (seconds: number | null) => {
-    if (seconds === null) return "-";
-    return seconds.toFixed(3) + "s";
-  };
 
   const fastestS1 = Math.min(...sectorTimes.filter(s => s.sector_1 !== null).map(s => s.sector_1!));
   const fastestS2 = Math.min(...sectorTimes.filter(s => s.sector_2 !== null).map(s => s.sector_2!));
