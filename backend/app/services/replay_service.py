@@ -47,6 +47,8 @@ class F1ReplaySession:
         self._serialized_frames = None
         self._msgpack_frames = None
         self.loading_status = "Initializing..."
+        self.quali_segments = {}
+        self.quali_results = []
 
         # NEW: Loading state tracking (fed by emit_progress, read by WebSocket handler)
         self.state = LoadingState.INIT
@@ -130,8 +132,10 @@ class F1ReplaySession:
                     executor,
                     lambda: get_quali_telemetry(session, session_type=self.session_type, refresh=self.refresh, progress_callback=progress_callback)
                 )
-                self.frames = data.get("frames", [])
+                self.quali_segments = data.get("segments", {})
                 self.driver_colors = data.get("driver_colors", {})
+                self.quali_results = data.get("results", [])
+                self.frames = []
             else:
                 data = await loop.run_in_executor(
                     executor,
@@ -390,7 +394,7 @@ class F1ReplaySession:
         return driver_teams
 
     def get_metadata(self) -> dict:
-        return {
+        metadata = {
             "year": self.year,
             "round": self.round_num,
             "session_type": self.session_type,
@@ -407,3 +411,7 @@ class F1ReplaySession:
             "race_start_time": self.race_start_time,
             "error": self.load_error,
         }
+        if self.session_type in ["Q", "SQ"]:
+            metadata["quali_segments"] = getattr(self, "quali_segments", {})
+            metadata["quali_results"] = getattr(self, "quali_results", [])
+        return metadata

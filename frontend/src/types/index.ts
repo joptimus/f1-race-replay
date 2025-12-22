@@ -73,6 +73,7 @@ export interface SessionMetadata {
   track_geometry?: TrackGeometry;
   track_statuses?: TrackStatus[];
   race_start_time?: number;
+  quali_segments?: QualiSegments;
   error?: string;
 }
 
@@ -156,3 +157,42 @@ export interface ComparisonDriver {
   color: [number, number, number];
   lapNumber: number;
 }
+
+export interface QualiDriverFrame {
+  t: number;
+  x: number;
+  y: number;
+  dist: number;
+  speed: number;
+  gear: number;
+  throttle: number;
+  brake: number;
+  drs: number;
+}
+
+export interface QualiDriverData {
+  frames: QualiDriverFrame[];
+  lap_time: number;
+}
+
+export interface QualiSegment {
+  duration: number;
+  drivers: Record<string, QualiDriverData>;
+}
+
+export interface QualiSegments {
+  Q1: QualiSegment;
+  Q2: QualiSegment;
+  Q3: QualiSegment;
+}
+
+export interface QualiResult {
+  code: string;
+  position: number;
+  color: [number, number, number];
+  Q1: string | null;
+  Q2: string | null;
+  Q3: string | null;
+}
+
+export type QualiSegmentName = "Q1" | "Q2" | "Q3" | "Progressive";
