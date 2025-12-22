@@ -32,11 +32,6 @@ export const Leaderboard: React.FC = () => {
     }
   }, [currentFrame]);
 
-  const raceStarted = React.useMemo(() => {
-    if (!metadata?.race_start_time || !currentFrame) return false;
-    return currentFrame.t >= metadata.race_start_time;
-  }, [metadata?.race_start_time, currentFrame?.t]);
-
   const drivers = React.useMemo(() => {
     if (!currentFrame?.drivers) return [];
     return Object.entries(currentFrame.drivers)
@@ -64,18 +59,7 @@ export const Leaderboard: React.FC = () => {
   }, [metadata?.track_statuses, currentFrame]);
 
   if (!currentFrame || !metadata || !currentFrame.drivers) return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100%',
-      width: '100%',
-      color: '#6b7280',
-      fontSize: '0.875rem',
-      fontWeight: 600,
-      letterSpacing: '0.05em',
-      fontFamily: 'monospace',
-    }}>
+    <div className="flex items-center justify-center h-full w-full text-gray-500 text-sm font-semibold tracking-wide font-mono">
       SELECT A RACE
     </div>
   );
@@ -84,7 +68,7 @@ export const Leaderboard: React.FC = () => {
   const currentLap = currentFrame?.lap || 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%' }}>
+    <div className="flex flex-col h-full min-h-0 w-full">
       <AnimatePresence mode="wait">
         {isSafetyCarActive && (
           <motion.div
@@ -92,41 +76,33 @@ export const Leaderboard: React.FC = () => {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            style={{
-              width: '100%',
-              overflow: 'hidden',
-              flexShrink: 0,
-            }}
+            className="w-full overflow-hidden flex-shrink-0"
           >
             <img
               src="/images/fia/safetycar.png"
               alt="Safety Car"
-              style={{
-                width: '100%',
-                height: 'auto',
-                display: 'block',
-              }}
+              className="w-full h-auto block"
             />
           </motion.div>
         )}
       </AnimatePresence>
-      <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)', flexShrink: 0 }}>
-        <div className="f1-monospace" style={{ fontSize: '0.85rem', color: '#e10600', fontWeight: 900, marginBottom: '4px' }}>
-          LAP: <span style={{ fontSize: '1rem' }}>{currentLap}/{totalLaps}</span>
+      <div className="mb-3 pb-2 border-b border-f1-border flex-shrink-0">
+        <div className="f1-monospace text-[0.85rem] text-f1-red font-black mb-1">
+          LAP: <span className="text-base">{currentLap}/{totalLaps}</span>
         </div>
-        <div className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af' }}>
+        <div className="f1-monospace text-[0.65rem] text-gray-400">
           TIME: {currentFrame?.t ? (currentFrame.t / 60).toFixed(2) : '0.00'}m | FRAME: {currentFrame?.t !== undefined ? Math.round(currentFrame.t * 25) : 0}
         </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--f1-border)', flexShrink: 0 }}>
-        <h3 style={{ fontWeight: 900, textTransform: 'uppercase', color: '#e10600', fontSize: '0.75rem', margin: 0 }}>STANDINGS</h3>
-        <div style={{ display: 'flex', gap: '16px', marginRight: '8px', alignItems: 'center' }}>
-          <span className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af', width: '40px', textAlign: 'right' }}>GAP</span>
-          <span className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af', width: '40px', textAlign: 'right' }}>LEADER</span>
-          <span className="f1-monospace" style={{ fontSize: '0.65rem', color: '#9ca3af', width: '24px', textAlign: 'center' }}>TYRE</span>
+      <div className="flex justify-between items-center mb-2 pb-2 border-b border-f1-border flex-shrink-0">
+        <h3 className="font-black uppercase text-f1-red text-[0.75rem]">STANDINGS</h3>
+        <div className="flex gap-4 mr-2 items-center">
+          <span className="f1-monospace text-[0.65rem] text-gray-400 w-10 text-right">GAP</span>
+          <span className="f1-monospace text-[0.65rem] text-gray-400 w-10 text-right">LEADER</span>
+          <span className="f1-monospace text-[0.65rem] text-gray-400 w-6 text-center">TYRE</span>
         </div>
       </div>
-      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="flex-1 overflow-auto flex flex-col min-h-0">
         <AnimatePresence mode="popLayout">
           {drivers.map(({ code, data, position, color, isOut }, index) => {
             const isSelected = selectedDriver?.code === code;
@@ -148,16 +124,8 @@ export const Leaderboard: React.FC = () => {
             return (
               <React.Fragment key={code}>
                 {isFirstOutDriver && currentLap > 1 && (
-                  <div
-                    style={{
-                      padding: '8px 0',
-                      margin: '4px 0',
-                      borderTop: '1px solid rgba(239, 68, 68, 0.3)',
-                      borderBottom: '1px solid rgba(239, 68, 68, 0.3)',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <span style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: 700, textTransform: 'uppercase' }}>
+                  <div className="py-2 my-1 border-t border-b border-red-600 border-opacity-30 text-center">
+                    <span className="text-[0.65rem] text-red-500 font-bold uppercase">
                       RETIRED
                     </span>
                   </div>
@@ -171,25 +139,23 @@ export const Leaderboard: React.FC = () => {
                       setSelectedDriver({ code, data, color });
                     }
                   }}
-                  className={`f1-row ${isSelected ? 'selected' : ''}`}
+                  className={`f1-row ${isSelected ? 'selected' : ''} cursor-pointer`}
                   style={{
                     borderLeft: `4px solid ${isOut ? '#6b7280' : hexColor}`,
-                    cursor: 'pointer',
                     opacity: isOut ? 0.4 : 1,
                     backgroundColor: isOut ? 'rgba(0, 0, 0, 0.3)' : undefined,
-                    pointerEvents: isOut ? 'auto' : 'auto',
                   }}
                 >
-                  <span className="f1-monospace" style={{ width: '25px', fontWeight: 900, fontSize: '0.75rem', color: isOut ? '#6b7280' : 'inherit' }}>{position}</span>
-                  <span style={{ fontWeight: 700, width: '40px', fontSize: '0.85rem', color: isOut ? '#6b7280' : 'inherit' }}>{code}</span>
+                  <span className="f1-monospace w-6 font-black text-[0.75rem]" style={{ color: isOut ? '#6b7280' : 'inherit' }}>{position}</span>
+                  <span className="font-bold w-10 text-[0.85rem]" style={{ color: isOut ? '#6b7280' : 'inherit' }}>{code}</span>
 
-                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '16px', alignItems: 'center' }}>
+                  <div className="ml-auto flex gap-4 items-center">
                     {!isOut && (
                       <>
-                        <span className="f1-monospace" style={{ fontSize: '0.7rem', opacity: 0.8, width: '40px', textAlign: 'right' }}>
+                        <span className="f1-monospace text-[0.7rem] opacity-80 w-10 text-right">
                           {gapToPrevious}
                         </span>
-                        <span className="f1-monospace" style={{ fontSize: '0.7rem', opacity: 0.8, width: '40px', textAlign: 'right' }}>
+                        <span className="f1-monospace text-[0.7rem] opacity-80 w-10 text-right">
                           {gapToLeader}
                         </span>
                       </>
@@ -198,8 +164,8 @@ export const Leaderboard: React.FC = () => {
 
                   <img
                     src={`/images/tyres/${TYRE_MAP[data.tyre] || '2.png'}`}
-                    className="tyre-icon"
-                    style={{ marginLeft: '8px', height: '16px', width: 'auto', opacity: isOut ? 0.3 : 1 }}
+                    className="tyre-icon ml-2 h-4 w-auto"
+                    style={{ opacity: isOut ? 0.3 : 1 }}
                     onError={(e) => (e.currentTarget.style.opacity = '0')}
                   />
                 </motion.div>
