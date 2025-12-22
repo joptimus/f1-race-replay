@@ -73,6 +73,7 @@ export interface SessionMetadata {
   track_geometry?: TrackGeometry;
   track_statuses?: TrackStatus[];
   race_start_time?: number;
+  quali_segments?: QualiSegments;
   error?: string;
 }
 
