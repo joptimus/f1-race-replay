@@ -10,6 +10,12 @@ This directory contains all project documentation organized by topic/feature.
   - [Directory Structure](./REFACTORING/DIRECTORY-STRUCTURE.md) - File organization guide
   - [Post-Refactoring Checklist](./REFACTORING/POST-REFACTORING-CHECKLIST.md) - Verification checklist
 
+### 🎬 Loading Modal System
+- [**LOADING-MODAL/**](./LOADING-MODAL/) - WebSocket-based loading state and session initialization
+  - [Overview](./LOADING-MODAL/README.md) - Architecture and components
+  - [Plan vs Reality](./LOADING-MODAL/plan-vs-reality.md) - Design decisions and technical trade-offs
+  - [Data Timeline](./LOADING-MODAL/data-timeline.md) - Detailed data flow sequence T+0 to T+100
+
 ### 🏆 Leaderboard System
 - [**LEADERBOARD/**](./LEADERBOARD/) - Leaderboard debugging and implementation
   - [Debug Guide](./LEADERBOARD/LEADERBOARD-DEBUG-GUIDE.md) - Debugging leaderboard issues
@@ -71,6 +77,7 @@ For core information, refer to the main project files:
 
 | Topic | Location | Status |
 |-------|----------|--------|
+| Loading Modal System | [LOADING-MODAL/](./LOADING-MODAL/) | ✅ Complete |
 | Refactoring (2025-12-20) | [REFACTORING/](./REFACTORING/) | ✅ Active |
 | Leaderboard Debugging | [LEADERBOARD/](./LEADERBOARD/) | 📋 In Progress |
 | Implementation Plans | [plans/](./plans/) | 📝 Reference |

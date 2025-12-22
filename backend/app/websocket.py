@@ -28,6 +28,8 @@ logger = logging.getLogger("backend.websocket")
 
 async def handle_replay_websocket(websocket: WebSocket, session_id: str, active_sessions: dict):
     connection_start = time.time()
+    session = None
+    progress_callback = None
 
     try:
         await websocket.accept(subprotocol=None)
@@ -35,58 +37,127 @@ async def handle_replay_websocket(websocket: WebSocket, session_id: str, active_
 
         if session_id not in active_sessions:
             logger.warning(f"[WS] Session {session_id} not found. Available: {list(active_sessions.keys())}")
-            await websocket.send_json({"error": "Session not found"})
+            await websocket.send_json({
+                "type": "loading_error",
+                "message": "Session not found"
+            })
             await websocket.close()
             return
 
         session = active_sessions[session_id]
 
-        # Wait for session to load with timeout
-        load_timeout = 300  # 5 minutes max
-        load_start = asyncio.get_event_loop().time()
-        load_check_interval = 0.5
-        last_status_sent = 0
+        # Register progress callback to emit WebSocket events during loading
+        async def progress_callback_fn(state, progress: int, message: str):
+            """Called by session.load_data() as it processes telemetry."""
+            try:
+                await websocket.send_json({
+                    "type": "loading_progress",
+                    "progress": progress,
+                    "message": message,
+                    "elapsed_seconds": int(time.time() - connection_start)
+                })
+                logger.debug(f"[WS] Sent progress to {session_id}: {progress}% - {message}")
+            except Exception as e:
+                logger.warning(f"[WS] Failed to send progress for {session_id}: {e}")
 
-        while not session.is_loaded:
-            elapsed = asyncio.get_event_loop().time() - load_start
+        progress_callback = progress_callback_fn
+        session.register_progress_callback(progress_callback)
 
-            # Send status update every 2 seconds
-            if elapsed - last_status_sent > 2.0:
-                try:
+        # Send initial progress if loading is already in progress
+        try:
+            await websocket.send_json({
+                "type": "loading_progress",
+                "progress": session.progress,
+                "message": session.loading_status or "Loading...",
+                "elapsed_seconds": int(time.time() - connection_start)
+            })
+            logger.debug(f"[WS] Sent initial progress to {session_id}: {session.progress}% - {session.loading_status}")
+        except Exception as e:
+            logger.warning(f"[WS] Failed to send initial progress for {session_id}: {e}")
+
+        # CRITICAL FIX: Handle "late joiner" scenario where session is already loaded
+        if session.is_loaded:
+            logger.debug(f"[WS] Session {session_id} already loaded, sending catch-up events")
+            await websocket.send_json({
+                "type": "loading_progress",
+                "progress": session.progress or 100,
+                "message": session.loading_status or "Ready for playback",
+                "elapsed_seconds": int(time.time() - connection_start)
+            })
+            await websocket.send_json({
+                "type": "loading_complete",
+                "frames": len(session.frames),
+                "load_time_seconds": 0,
+                "elapsed_seconds": int(time.time() - connection_start),
+                "metadata": {
+                    "year": session.year,
+                    "round": session.round_num,
+                    "session_type": session.session_type,
+                    "total_frames": len(session.frames) if session.frames else 0,
+                    "total_laps": session.total_laps,
+                    "driver_colors": {
+                        code: list(color) if isinstance(color, tuple) else color
+                        for code, color in session.driver_colors.items()
+                    },
+                    "driver_numbers": session.driver_numbers,
+                    "driver_teams": session.driver_teams,
+                    "track_geometry": session.track_geometry,
+                    "track_statuses": session.track_statuses,
+                    "race_start_time": session.race_start_time,
+                    "error": session.load_error,
+                }
+            })
+        else:
+            # Wait for session to load
+            load_timeout = 300  # 5 minutes
+            load_start = time.time()
+
+            while not session.is_loaded:
+                elapsed = time.time() - load_start
+                if elapsed > load_timeout:
                     await websocket.send_json({
-                        "type": "status",
-                        "message": session.loading_status or "Loading...",
-                        "elapsed_seconds": int(elapsed)
+                        "type": "loading_error",
+                        "message": f"Session load timeout after {elapsed:.0f}s"
                     })
-                    last_status_sent = elapsed
-                    logger.debug(f"[WS] Sent status update to {session_id}: {session.loading_status}")
-                except Exception as status_error:
-                    logger.warning(f"[WS] Failed to send status update to {session_id}: {status_error}")
-                    break
+                    await websocket.close()
+                    return
+                await asyncio.sleep(0.5)
 
-            if elapsed > load_timeout:
-                logger.error(f"[WS] Session load timeout for {session_id} after {elapsed:.1f}s")
-                await websocket.send_json({"error": f"Session load timeout after {elapsed:.0f}s"})
+            if session.load_error:
+                await websocket.send_json({
+                    "type": "loading_error",
+                    "message": session.load_error
+                })
                 await websocket.close()
                 return
 
-            await asyncio.sleep(load_check_interval)
+            # Emit final loading_complete with session metadata
+            load_time = time.time() - load_start
+            await websocket.send_json({
+                "type": "loading_complete",
+                "frames": len(session.frames),
+                "load_time_seconds": load_time,
+                "elapsed_seconds": int(time.time() - connection_start),
+                "metadata": {
+                    "year": session.year,
+                    "round": session.round_num,
+                    "session_type": session.session_type,
+                    "total_frames": len(session.frames) if session.frames else 0,
+                    "total_laps": session.total_laps,
+                    "driver_colors": {
+                        code: list(color) if isinstance(color, tuple) else color
+                        for code, color in session.driver_colors.items()
+                    },
+                    "driver_numbers": session.driver_numbers,
+                    "driver_teams": session.driver_teams,
+                    "track_geometry": session.track_geometry,
+                    "track_statuses": session.track_statuses,
+                    "race_start_time": session.race_start_time,
+                    "error": session.load_error,
+                }
+            })
 
-        if session.load_error:
-            logger.error(f"[WS] Session {session_id} has load error: {session.load_error}")
-            await websocket.send_json({"error": session.load_error})
-            await websocket.close()
-            return
-
-        load_time = asyncio.get_event_loop().time() - load_start
-        logger.info(f"[WS] Session {session_id} loaded with {len(session.frames)} frames in {load_time:.1f}s")
-
-        # Send ready message
-        await websocket.send_json({
-            "type": "ready",
-            "frames": len(session.frames),
-            "load_time_seconds": load_time
-        })
+        logger.info(f"[WS] Session {session_id} loaded with {len(session.frames)} frames")
 
         # Playback state
         frame_index = 0.0
@@ -169,6 +240,10 @@ async def handle_replay_websocket(websocket: WebSocket, session_id: str, active_
         except Exception as e:
             logger.error(f"[WS] Unexpected WebSocket error for {session_id}: {e}", exc_info=True)
         finally:
+            # CRITICAL: Clean up callback to prevent memory leak
+            if session is not None and progress_callback is not None:
+                session.unregister_progress_callback(progress_callback)
+
             total_time = time.time() - connection_start
             logger.info(f"[WS] Connection closed for {session_id} after {total_time:.1f}s ({frames_sent} frames sent)")
             try:

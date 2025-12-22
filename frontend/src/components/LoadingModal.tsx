@@ -2,50 +2,43 @@
  * Loading modal shown while session data is being fetched
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLoadingState } from "../hooks/useLoadingState";
+import { useReplayStore } from "../store/replayStore";
 
 interface LoadingModalProps {
   isOpen: boolean;
+  sessionId: string | null;
   year?: number;
   round?: number;
-  isFullyLoaded?: boolean;
 }
 
 export const LoadingModal: React.FC<LoadingModalProps> = ({
   isOpen,
+  sessionId,
   year = 2025,
   round = 1,
-  isFullyLoaded = false,
 }) => {
-  const [progress, setProgress] = useState(0);
+  // CRITICAL: Pass isOpen to useLoadingState to drive openedAt reset
+  // This fixes the "reload same race → instant close" bug
+  const { progress, error, shouldClose, getCloseDelayMs } = useLoadingState(sessionId, isOpen);
+  const setSessionLoading = useReplayStore((state) => state.setSessionLoading);
 
   useEffect(() => {
-    if (!isOpen) {
-      setProgress(0);
-      return;
+    // Only run this effect if modal is open and should close
+    if (!isOpen) return;
+
+    if (shouldClose()) {
+      const delay = getCloseDelayMs();
+      if (delay <= 0) {
+        setSessionLoading(false);
+      } else {
+        const timer = setTimeout(() => setSessionLoading(false), delay);
+        return () => clearTimeout(timer);
+      }
     }
-
-    // Simulate progress from 0 to 90% during loading
-    // The actual data load completion will set it to 100%
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        // Increase progress but slow down as we approach 90%
-        if (prev >= 90) return 90;
-        const increment = Math.max(1, (90 - prev) * 0.05);
-        return Math.min(90, prev + increment);
-      });
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [isOpen]);
-
-  // Jump to 100% when fully loaded
-  useEffect(() => {
-    if (isFullyLoaded) {
-      setProgress(100);
-    }
-  }, [isFullyLoaded]);
+  }, [isOpen, shouldClose, getCloseDelayMs, setSessionLoading]);
 
   return (
     <AnimatePresence>
@@ -146,47 +139,50 @@ export const LoadingModal: React.FC<LoadingModalProps> = ({
             </div>
 
             {/* Progress Bar */}
-            <div style={{ marginBottom: "16px" }}>
-              <div
-                style={{
-                  width: "100%",
-                  height: "8px",
-                  backgroundColor: "#374151",
-                  borderRadius: "4px",
-                  overflow: "hidden",
-                  marginBottom: "8px",
-                }}
-              >
-                <motion.div
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
+            {!error && (
+              <div style={{ marginBottom: "16px" }}>
+                <div
                   style={{
-                    height: "100%",
-                    background: "linear-gradient(to right, #e10600, #ff4444)",
+                    width: "100%",
+                    height: "8px",
+                    backgroundColor: "#374151",
                     borderRadius: "4px",
+                    overflow: "hidden",
+                    marginBottom: "8px",
                   }}
-                />
+                >
+                  <motion.div
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    style={{
+                      height: "100%",
+                      background: "linear-gradient(to right, #e10600, #ff4444)",
+                      borderRadius: "4px",
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.875rem",
+                    color: "#9ca3af",
+                    fontFamily: "monospace",
+                    fontWeight: 600,
+                  }}
+                >
+                  {Math.round(progress)}%
+                </div>
               </div>
-              <div
-                style={{
-                  fontSize: "0.875rem",
-                  color: "#9ca3af",
-                  fontFamily: "monospace",
-                  fontWeight: 600,
-                }}
-              >
-                {Math.round(progress)}%
-              </div>
-            </div>
+            )}
 
+            {/* Error Message or Status */}
             <div
               style={{
                 fontSize: "0.875rem",
-                color: "#9ca3af",
+                color: error ? "#ff6b6b" : "#9ca3af",
                 fontFamily: "monospace",
               }}
             >
-              Processing telemetry data...
+              {error ? error : "Processing telemetry data..."}
             </div>
           </motion.div>
         </div>

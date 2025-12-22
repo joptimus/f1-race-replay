@@ -20,6 +20,14 @@ interface ReplayStore {
   setSessionLoading: (loading: boolean) => void;
   setSessionError: (error: string) => void;
 
+  // Loading state (fed by useReplayWebSocket)
+  loadingProgress: number;
+  loadingError: string | null;
+  isLoadingComplete: boolean;
+  setLoadingProgress: (progress: number) => void;
+  setLoadingError: (error: string | null) => void;
+  setLoadingComplete: (complete: boolean) => void;
+
   // Frame data (current frame only - avoid storing huge arrays)
   currentFrame: FrameData | null;
   setCurrentFrame: (frame: FrameData) => void;
@@ -79,6 +87,17 @@ export const useReplayStore = create<ReplayStore>()(
       set((state) => ({
         session: { ...state.session, error, isLoading: false },
       })),
+
+    // Loading state
+    loadingProgress: 0,
+    loadingError: null,
+    isLoadingComplete: false,
+    setLoadingProgress: (progress: number) =>
+      set({ loadingProgress: progress }),
+    setLoadingError: (error: string | null) =>
+      set({ loadingError: error }),
+    setLoadingComplete: (complete: boolean) =>
+      set({ isLoadingComplete: complete }),
 
     // Frame data
     currentFrame: null,

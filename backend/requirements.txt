@@ -1,3 +1,8 @@
 fastf1
 pandas
 numpy
+fastapi
+uvicorn
+aiofiles
+msgpack
+python-multipart

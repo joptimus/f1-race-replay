@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
+import asyncio
 import sys
 import shutil
 from pathlib import Path
@@ -15,7 +16,7 @@ active_sessions = {}
 
 
 @router.post("")
-async def create_session(background_tasks: BackgroundTasks, request: SessionRequest):
+async def create_session(request: SessionRequest):
     year = request.year
     round_num = request.round_num
     session_type = request.session_type
@@ -24,21 +25,15 @@ async def create_session(background_tasks: BackgroundTasks, request: SessionRequ
 
     if session_id in active_sessions and not refresh:
         session = active_sessions[session_id]
-        if session.is_loaded:
-            if session.load_error:
-                raise HTTPException(status_code=400, detail=session.load_error)
-            return {"session_id": session_id, "metadata": session.get_metadata()}
+        if session.is_loaded and not session.load_error:
+            return {"session_id": session_id}
 
     session = F1ReplaySession(year, round_num, session_type, refresh=refresh)
     active_sessions[session_id] = session
 
-    background_tasks.add_task(session.load_data)
+    asyncio.create_task(session.load_data())
 
-    return {
-        "session_id": session_id,
-        "loading": True,
-        "metadata": session.get_metadata(),
-    }
+    return {"session_id": session_id}
 
 
 @router.get("/{session_id}")

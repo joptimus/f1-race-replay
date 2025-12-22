@@ -24,9 +24,8 @@
 }
 
 html, body, #root {
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
+  height: 100%;
+  width: 100%;
   background-color: var(--f1-carbon);
   color: var(--f1-white);
   font-family: var(--font-main);
@@ -262,11 +261,11 @@ html, body, #root {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  width: 100vw;
+  min-height: 100vh;
+  width: 100%;
   background: linear-gradient(135deg, var(--f1-carbon) 0%, var(--f1-black) 100%);
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .landing-page-container::before {
@@ -291,6 +290,7 @@ html, body, #root {
   gap: 48px;
   max-width: 600px;
   padding: 40px;
+  padding-bottom: 120px;
 }
 
 .landing-header {
@@ -298,12 +298,13 @@ html, body, #root {
 }
 
 .landing-title {
-  font-size: 4rem;
+  font-size: clamp(2rem, 8vw, 4rem);
   font-weight: 900;
   letter-spacing: 0.1em;
   color: var(--f1-white);
   margin-bottom: 12px;
   text-shadow: 0 4px 20px rgba(225, 6, 0, 0.3);
+  white-space: nowrap;
 }
 
 .landing-subtitle {
@@ -318,6 +319,26 @@ html, body, #root {
   gap: 20px;
   width: 100%;
   flex-direction: column;
+}
+
+@media (max-width: 640px) {
+  .landing-page-content {
+    gap: 32px;
+    padding: 20px;
+    padding-bottom: 40px;
+  }
+
+  .landing-subtitle {
+    font-size: 1rem;
+  }
+
+  .details-title {
+    font-size: 1.4rem;
+  }
+
+  .landing-button {
+    font-size: 0.95rem;
+  }
 }
 
 .selector-group {
@@ -464,9 +485,10 @@ html, body, #root {
 }
 
 .landing-footer {
-  position: absolute;
-  bottom: 40px;
+  margin-top: auto;
+  padding: 40px 20px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .footer-text {

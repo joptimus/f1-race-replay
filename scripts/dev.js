@@ -20,6 +20,7 @@ const ROOT_DIR = path.dirname(__dirname);
 const BACKEND_DIR = path.join(ROOT_DIR, 'backend');
 const FRONTEND_DIR = path.join(ROOT_DIR, 'frontend');
 const SCRIPTS_DIR = path.join(ROOT_DIR, 'scripts');
+const COMPUTED_DATA_DIR = path.join(ROOT_DIR, 'computed_data');
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const CACHE_DIR = path.join(ROOT_DIR, '.fastf1-cache');
 const NO_OPEN = process.argv.includes('--no-open');
@@ -44,20 +45,30 @@ function clearCache() {
   log(colors.cyan, 'CACHE', 'Clearing caches...');
 
   const dirsToClean = [
-    { path: DATA_DIR, name: 'computed telemetry' },
+    { path: COMPUTED_DATA_DIR, name: 'computed telemetry' },
+    { path: DATA_DIR, name: 'legacy data' },
     { path: CACHE_DIR, name: 'FastF1 API' },
   ];
+
+  let clearedCount = 0;
+  let failedCount = 0;
 
   dirsToClean.forEach(({ path: dirPath, name }) => {
     if (fs.existsSync(dirPath)) {
       try {
         fs.rmSync(dirPath, { recursive: true });
-        log(colors.green, 'CACHE', `Cleared ${name} cache`);
+        log(colors.green, 'CACHE', `✓ Cleared ${name} cache (${dirPath})`);
+        clearedCount++;
       } catch (error) {
-        log(colors.yellow, 'CACHE', `Could not clear ${name} cache: ${error.message}`);
+        log(colors.yellow, 'CACHE', `✗ Could not clear ${name} cache: ${error.message}`);
+        failedCount++;
       }
+    } else {
+      log(colors.cyan, 'CACHE', `- ${name} cache not found (${dirPath})`);
     }
   });
+
+  log(colors.green, 'CACHE', `Cache cleanup summary: ${clearedCount} cleared, ${failedCount} failed`);
 }
 
 function clearPorts() {
@@ -96,7 +107,7 @@ async function checkDependencies() {
   log(colors.cyan, 'SETUP', 'Checking dependencies...');
 
   try {
-    execSync('python --version', { stdio: 'pipe' });
+    execSync('python3 --version', { stdio: 'pipe' });
   } catch {
     log(colors.yellow, 'SETUP', 'Python not found. Please install Python 3.8+');
     process.exit(1);
@@ -120,7 +131,6 @@ async function checkDependencies() {
 async function installBackendDependencies() {
   log(colors.cyan, 'BACKEND', 'Installing Python dependencies...');
 
-  const venvPath = path.join(BACKEND_DIR, 'venv');
   const requirementsPath = path.join(BACKEND_DIR, 'requirements.txt');
 
   if (!fs.existsSync(requirementsPath)) {
@@ -129,13 +139,13 @@ async function installBackendDependencies() {
   }
 
   try {
-    execSync(`pip install -r "${requirementsPath}"`, {
+    execSync(`python3 -m pip install -r "${requirementsPath}" -q`, {
       cwd: BACKEND_DIR,
-      stdio: 'inherit',
+      stdio: 'pipe',
     });
-    log(colors.green, 'BACKEND', 'Dependencies installed');
+    log(colors.green, 'BACKEND', '✓ Dependencies installed (all requirements satisfied)');
   } catch (error) {
-    log(colors.yellow, 'BACKEND', 'Failed to install dependencies');
+    log(colors.yellow, 'BACKEND', '✗ Failed to install dependencies');
   }
 }
 
@@ -156,7 +166,7 @@ async function installFrontendDependencies() {
 function startBackend() {
   log(colors.blue, 'BACKEND', 'Starting FastAPI server...');
 
-  const backend = spawn('python', ['main.py'], {
+  const backend = spawn('python3', ['main.py'], {
     cwd: BACKEND_DIR,
     stdio: 'inherit',
     shell: true,

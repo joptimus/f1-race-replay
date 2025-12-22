@@ -173,11 +173,10 @@ const DriverHero = ({ year }: { year?: number }) => {
 
 const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year: number, round: number, refresh?: boolean) => void; onRefreshData: () => void }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [lightsSequenceActive, setLightsSequenceActive] = useState(false);
   const [hasPlayedLights, setHasPlayedLights] = useState(false);
   const lightsBoardRef = useRef<LightsBoardHandle>(null);
   const { session, setTotalFrames, play } = useReplayStore();
-  const { isConnected, resumePlayback } = useReplayWebSocket(session.sessionId, lightsSequenceActive);
+  const { isConnected } = useReplayWebSocket(session.sessionId);
   const { isEnabled: showSectorColors, toggle: toggleSectorColors } = useSectorColors();
 
   // Animate playback - advances frameIndex during playback
@@ -188,9 +187,8 @@ const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year
     // Only show lights board if this is the first play (not a resume)
     if (!hasPlayedLights) {
       console.log('Showing lights board');
-      setLightsSequenceActive(true);
       setHasPlayedLights(true);
-      play();
+      // Don't call play() yet - wait for lights sequence to complete
       lightsBoardRef.current?.startSequence();
     } else {
       console.log('Skipping lights board, already played');
@@ -200,8 +198,8 @@ const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year
   };
 
   const handleLightsSequenceComplete = () => {
-    setLightsSequenceActive(false);
-    resumePlayback();
+    // Now start playback after lights complete
+    play();
   };
 
   // Update total frames when session metadata changes and reset lights flag on new session
@@ -331,45 +329,17 @@ function AppRoutes() {
     return () => window.removeEventListener('sessionTypeChange', handleSessionTypeChangeEvent);
   }, []);
 
-  const pollSessionStatus = async (sessionId: string) => {
-    const maxAttempts = 120;
-    let attempts = 0;
-
-    const poll = async () => {
-      try {
-        const response = await fetch(`/api/sessions/${sessionId}`);
-        const data = await response.json();
-
-        setSession(data.session_id, data.metadata);
-
-        if (!data.loading) {
-          setSessionLoading(false);
-          navigate("/replay");
-          return;
-        }
-
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 1000);
-        } else {
-          setSessionLoading(false);
-          navigate("/replay");
-        }
-      } catch (err) {
-        console.error("Failed to poll session status:", err);
-        setSessionLoading(false);
-      }
-    };
-
-    poll();
-  };
-
   const handleSessionSelect = async (year: number, round: number, refresh: boolean = false) => {
     try {
       if (session.sessionId) {
         pause();
       }
-      setSessionLoading(true);
+
+      // CRITICAL: Reset loading state BEFORE opening modal
+      const store = useReplayStore.getState();
+      store.setLoadingProgress(0);
+      store.setLoadingError(null);
+      store.setLoadingComplete(false);
 
       // Preload images in the background while loading the session
       const drivers = dataService.getAllDriversForYear(year);
@@ -388,9 +358,14 @@ function AppRoutes() {
         body: JSON.stringify({ year, round_num: round, session_type: "R", refresh })
       });
       const data = await response.json();
-      setSession(data.session_id, data.metadata);
-      setSessionLoading(true);
-      pollSessionStatus(data.session_id);
+
+      setSession(data.session_id, {
+        year,
+        round,
+        session_type: "R",
+      } as any);
+      setSessionLoading(true);  // NOW open modal - WebSocket will close it when done
+      navigate("/replay");
     } catch (err) {
       console.error("Failed to load session:", err);
       setSessionLoading(false);
@@ -414,7 +389,12 @@ function AppRoutes() {
       if (session.sessionId) {
         pause();
       }
-      setSessionLoading(true);
+
+      // CRITICAL: Reset loading state BEFORE opening modal
+      const store = useReplayStore.getState();
+      store.setLoadingProgress(0);
+      store.setLoadingError(null);
+      store.setLoadingComplete(false);
 
       // Preload images in the background while loading the session
       const drivers = dataService.getAllDriversForYear(year);
@@ -433,9 +413,13 @@ function AppRoutes() {
         body: JSON.stringify({ year, round_num: round, session_type: sessionType, refresh: false })
       });
       const data = await response.json();
-      setSession(data.session_id, data.metadata);
-      setSessionLoading(true);
-      pollSessionStatus(data.session_id);
+
+      setSession(data.session_id, {
+        year,
+        round,
+        session_type: sessionType,
+      } as any);
+      setSessionLoading(true);  // NOW open modal - WebSocket will close it when done
     } catch (err) {
       console.error("Failed to load session:", err);
       setSessionLoading(false);
@@ -463,9 +447,9 @@ function App() {
       <AppRoutes />
       <LoadingModal
         isOpen={session.isLoading}
+        sessionId={session.sessionId}
         year={session.metadata?.year}
         round={session.metadata?.round}
-        isFullyLoaded={!!session.metadata?.total_frames && !session.isLoading}
       />
     </BrowserRouter>
   );

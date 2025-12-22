@@ -14,13 +14,17 @@ interface WebSocketMessage {
   frame?: number;
 }
 
-export const useReplayWebSocket = (sessionId: string | null, delayPlayback: boolean = false) => {
+export const useReplayWebSocket = (sessionId: string | null) => {
   const wsRef = useRef<WebSocket | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setCurrentFrame = useReplayStore((state) => state.setCurrentFrame);
+  const setLoadingProgress = useReplayStore((state) => state.setLoadingProgress);
+  const setLoadingError = useReplayStore((state) => state.setLoadingError);
+  const setLoadingComplete = useReplayStore((state) => state.setLoadingComplete);
+  const setSession = useReplayStore((state) => state.setSession);
   const playback = useReplayStore((state) => state.playback);
   const lastSentCommandRef = useRef<WebSocketMessage | null>(null);
   const sendCommandRef = useRef<(message: WebSocketMessage) => void>();
-  const pendingPlaybackRef = useRef<boolean>(false);
 
   // Create sendCommand function (store in ref to avoid dependency issues)
   const sendCommand = useCallback((message: WebSocketMessage) => {
@@ -71,22 +75,37 @@ export const useReplayWebSocket = (sessionId: string | null, delayPlayback: bool
 
     wsRef.current.onmessage = async (event) => {
       try {
-        // Handle JSON control messages (ready, status, error)
+        // Handle JSON control messages (loading_progress, loading_complete, loading_error, frame data)
         if (typeof event.data === 'string') {
           const message = JSON.parse(event.data);
 
-          if (message.type === 'ready') {
-            console.log("[WS Client] Session ready - frames:", message.frames, "load time:", message.load_time_seconds + "s");
+          // ===== LOADING PHASE MESSAGES =====
+          if (message.type === 'loading_progress') {
+            console.log("[WS Client] Loading progress:", message.progress + "%");
+            setLoadingProgress(message.progress || 0);
             return;
           }
 
-          if (message.type === 'status') {
-            console.log("[WS Client] Status:", message.message, `(${message.elapsed_seconds}s)`);
+          if (message.type === 'loading_complete') {
+            console.log("[WS Client] Loading complete");
+            setLoadingProgress(100);
+            setLoadingComplete(true);
+            setLoadingError(null);
+
+            // Update session metadata if provided
+            if (message.metadata && sessionId) {
+              setSession(sessionId, message.metadata);
+              // Also set total frames for playback UI
+              if (message.frames) {
+                useReplayStore.getState().setTotalFrames(message.frames);
+              }
+            }
             return;
           }
 
-          if (message.error) {
-            console.error("[WS Client] Server error:", message.error);
+          if (message.type === 'loading_error') {
+            console.error("[WS Client] Loading error:", message.message);
+            setLoadingError(message.message || "Unknown error");
             return;
           }
 
@@ -136,16 +155,41 @@ export const useReplayWebSocket = (sessionId: string | null, delayPlayback: bool
     };
   }, [sessionId]);
 
+  // Timeout: if no activity within 10s, emit error
+  useEffect(() => {
+    if (!sessionId) return;
+
+    let hasReceivedMessage = false;
+
+    timeoutRef.current = setTimeout(() => {
+      if (!hasReceivedMessage) {
+        setLoadingError("Unable to connect to telemetry (timeout). Please try again.");
+      }
+    }, 10000);
+
+    // CRITICAL: Subscribe to ANY loading state change and clear timeout on first message
+    const unsubscribe = useReplayStore.subscribe(
+      (state) => ({
+        progress: state.loadingProgress,
+        complete: state.isLoadingComplete,
+        error: state.loadingError,
+      }),
+      () => {
+        hasReceivedMessage = true;
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      }
+    );
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      unsubscribe();
+    };
+  }, [sessionId, setLoadingError]);
+
   // Sync playback state to WebSocket
   useEffect(() => {
     // Only send playback commands if WebSocket is connected
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    // If delaying playback (lights board sequence), defer the play command
-    if (playback.isPlaying && delayPlayback && !pendingPlaybackRef.current) {
-      pendingPlaybackRef.current = true;
       return;
     }
 
@@ -157,7 +201,7 @@ export const useReplayWebSocket = (sessionId: string | null, delayPlayback: bool
     } else {
       sendCommandRef.current?.({ action: "pause" });
     }
-  }, [playback.isPlaying, playback.speed, delayPlayback]);
+  }, [playback.isPlaying, playback.speed]);
 
   // Sync frame index (seeking) to WebSocket
   useEffect(() => {
@@ -169,16 +213,6 @@ export const useReplayWebSocket = (sessionId: string | null, delayPlayback: bool
     sendCommandRef.current?.({ action: "seek", frame: playback.frameIndex });
   }, [playback.frameIndex]);
 
-  const resumePlayback = () => {
-    if (playback.isPlaying && pendingPlaybackRef.current) {
-      pendingPlaybackRef.current = false;
-      sendCommandRef.current?.({
-        action: "play",
-        speed: playback.speed,
-      });
-    }
-  };
-
   return {
     isConnected: wsRef.current?.readyState === WebSocket.OPEN,
     sendSeek: (frameIndex: number) => {
@@ -186,6 +220,5 @@ export const useReplayWebSocket = (sessionId: string | null, delayPlayback: bool
         sendCommandRef.current({ action: "seek", frame: frameIndex });
       }
     },
-    resumePlayback,
   };
 };
