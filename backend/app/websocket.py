@@ -94,23 +94,7 @@ async def handle_replay_websocket(websocket: WebSocket, session_id: str, active_
                 "frames": len(session.frames),
                 "load_time_seconds": 0,
                 "elapsed_seconds": int(time.time() - connection_start),
-                "metadata": {
-                    "year": session.year,
-                    "round": session.round_num,
-                    "session_type": session.session_type,
-                    "total_frames": len(session.frames) if session.frames else 0,
-                    "total_laps": session.total_laps,
-                    "driver_colors": {
-                        code: list(color) if isinstance(color, tuple) else color
-                        for code, color in session.driver_colors.items()
-                    },
-                    "driver_numbers": session.driver_numbers,
-                    "driver_teams": session.driver_teams,
-                    "track_geometry": session.track_geometry,
-                    "track_statuses": session.track_statuses,
-                    "race_start_time": session.race_start_time,
-                    "error": session.load_error,
-                }
+                "metadata": session.get_metadata()
             })
         else:
             # Wait for session to load
@@ -143,23 +127,7 @@ async def handle_replay_websocket(websocket: WebSocket, session_id: str, active_
                 "frames": len(session.frames),
                 "load_time_seconds": load_time,
                 "elapsed_seconds": int(time.time() - connection_start),
-                "metadata": {
-                    "year": session.year,
-                    "round": session.round_num,
-                    "session_type": session.session_type,
-                    "total_frames": len(session.frames) if session.frames else 0,
-                    "total_laps": session.total_laps,
-                    "driver_colors": {
-                        code: list(color) if isinstance(color, tuple) else color
-                        for code, color in session.driver_colors.items()
-                    },
-                    "driver_numbers": session.driver_numbers,
-                    "driver_teams": session.driver_teams,
-                    "track_geometry": session.track_geometry,
-                    "track_statuses": session.track_statuses,
-                    "race_start_time": session.race_start_time,
-                    "error": session.load_error,
-                }
+                "metadata": session.get_metadata()
             })
 
         logger.info(f"[WS] Session {session_id} loaded with {len(session.frames)} frames")
