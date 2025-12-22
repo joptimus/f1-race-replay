@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;700;900&family=JetBrains+Mono:wght@700&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* --- GLOBAL RESET --- */
 * {
   margin: 0;
@@ -232,27 +236,6 @@ html, body, #root {
 ::-webkit-scrollbar-thumb {
   background: #444;
   border-radius: 10px;
-}
-
-/* UTILITY CLASSES */
-.flex {
-  display: flex;
-}
-
-.flex-col {
-  flex-direction: column;
-}
-
-.items-center {
-  align-items: center;
-}
-
-.justify-between {
-  justify-content: space-between;
-}
-
-.h-full {
-  height: 100%;
 }
 
 /* --- LANDING PAGE --- */
