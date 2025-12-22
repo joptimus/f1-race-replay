@@ -54,5 +54,8 @@ nul
 
 #Claude
 .claude/
+!.claude/rules/
+!.claude/rules/*.md
+!.claude/AGENT_CHECKLIST.md
 CLAUDE.md
 .playwright-mcp/

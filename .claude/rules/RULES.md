@@ -1,17 +1,34 @@
+## 🚨 CRITICAL: Rule Enforcement for Protected Files
+
+**BEFORE you modify ANY file in this project, check if it's protected.**
+
+👉 **READ FIRST:** [CRITICAL_FILES.md](./CRITICAL_FILES.md)
+
+This registry lists files where rule compliance is MANDATORY before you can make changes. If the file you want to modify is listed there, you MUST:
+
+1. **READ** the associated rule document completely
+2. **UNDERSTAND** what it requires (planning, discovery, spikes, code review, etc.)
+3. **FOLLOW** the rule's process before implementing
+4. **VERIFY** you've met all requirements before committing
+
+**Rules are not optional. They are blockers.** If you modify a protected file without following its rule, code review will catch it and request changes.
+
+---
+
 ## ⚠️ CRITICAL: Code Review Rule for f1_data.py
 
 **ANY logic changes to `shared/telemetry/f1_data.py` REQUIRE independent code review by an expert agent BEFORE committing.**
 
 This rule exists because f1_data.py is the core telemetry processing hub - a single logic error can cause silent data corruption affecting all race replays.
 
-👉 **See:** [`docs/DEVELOPMENT/f1-data-review-rule.md`](../../docs/DEVELOPMENT/f1-data-review-rule.md)
+👉 **See:** [F1_DATA_REVIEW_RULE.md](./F1_DATA_REVIEW_RULE.md)
 
 **Before modifying f1_data.py logic:**
 1. Make the change
-2. Invoke specialized code review agent
+2. Invoke specialized code review agent using `superpowers:requesting-code-review` skill
 3. Get APPROVED status from review agent
 4. Create risk assessment document
-5. Reference review document in commit message
+5. Reference the rule in your commit message: `Implements CRITICAL_FILES:F1_DATA_REVIEW_RULE`
 
 This is not optional. Do not bypass this rule.
 
