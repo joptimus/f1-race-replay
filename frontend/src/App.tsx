@@ -92,8 +92,8 @@ const DriverHero = ({ year }: { year?: number }) => {
   const selected = useSelectedDriver();
 
   if (!selected) return (
-    <div className="f1-driver-card flex items-center justify-center border border-gray-700 bg-f1-black rounded-lg text-center">
-      <p className="f1-monospace text-gray-500 text-sm font-semibold tracking-wide">NO DRIVER SELECTED</p>
+    <div className="flex items-center justify-center min-h-[256px] border border-f1-border bg-f1-dark-gray rounded-xl text-center p-6 mb-3 flex-shrink-0">
+      <p className="f1-monospace text-f1-silver text-sm font-semibold tracking-wide">NO DRIVER SELECTED</p>
     </div>
   );
 
@@ -260,7 +260,7 @@ const ReplayView = ({ onSessionSelect, onRefreshData }: { onSessionSelect: (year
           </div>
         </main>
 
-        <aside className="flex flex-col overflow-hidden h-full">
+        <aside className="flex flex-col overflow-hidden h-full max-w-[300px]">
           <DriverHero year={year} />
           <div className="sidebar-scroll bg-f1-black p-4 rounded-lg border border-f1-border flex-1">
             <TelemetryChart />

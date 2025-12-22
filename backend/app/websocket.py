@@ -58,7 +58,12 @@ async def handle_replay_websocket(websocket: WebSocket, session_id: str, active_
                 })
                 logger.debug(f"[WS] Sent progress to {session_id}: {progress}% - {message}")
             except Exception as e:
-                logger.warning(f"[WS] Failed to send progress for {session_id}: {e}")
+                error_str = str(e).lower()
+                # Silently ignore WebSocket already closed errors
+                if "close message has been sent" in error_str or "websocket is closed" in error_str:
+                    logger.debug(f"[WS] WebSocket closed while sending progress for {session_id}")
+                else:
+                    logger.warning(f"[WS] Failed to send progress for {session_id}: {e}")
 
         progress_callback = progress_callback_fn
         session.register_progress_callback(progress_callback)
