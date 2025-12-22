@@ -5,10 +5,9 @@ from pathlib import Path
 def setup_logging(log_level=logging.INFO):
     """Configure structured logging for the F1 Race Replay backend"""
 
-    # Create formatters
-    detailed_formatter = logging.Formatter(
-        '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+    # Create formatter - friendly without timestamps
+    friendly_formatter = logging.Formatter(
+        '%(levelname)-8s %(name)s: %(message)s'
     )
 
     # Configure root logger
@@ -17,7 +16,7 @@ def setup_logging(log_level=logging.INFO):
 
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(detailed_formatter)
+    console_handler.setFormatter(friendly_formatter)
     root_logger.addHandler(console_handler)
 
     return root_logger
