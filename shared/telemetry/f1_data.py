@@ -1543,21 +1543,6 @@ def _process_quali_driver(args):
 
 
 def get_quali_telemetry(session, session_type='Q', refresh=False, progress_callback=None):
-    # This function is going to get the results from qualifying and the telemetry for each drivers' fastest laps in each qualifying segment
-
-    # The structure of the returned data will be:
-    # {
-    #   "results": [ { "code": driver_code, "position": position, "Q1": time, "Q2": time, "Q3": time }, ... ],
-    #   "telemetry": {
-    #       "driver_code": {
-    #           "Q1": { "frames": [ { "t": time, "x": x, "y": y, "dist": dist, "speed": speed, "gear": gear }, ... ] },
-    #           "Q2": { ... },
-    #           "Q3": { ... },
-    #       },
-    #       ...
-    #   }
-    # }
-
     event_name = str(session).replace(' ', '_')
     cache_suffix = 'sprintquali' if session_type == 'SQ' else 'quali'
 
@@ -1579,62 +1564,63 @@ def get_quali_telemetry(session, session_type='Q', refresh=False, progress_callb
         pass  # Need to compute from scratch
 
     qualifying_results = get_qualifying_results(session)
-
-    telemetry_data = {}
-
-    max_speed = 0.0
-    min_speed = 0.0
+    driver_colors = get_driver_colors(session)
 
     driver_codes = {
         num: session.get_driver(num)["Abbreviation"]
         for num in session.drivers
     }
 
-    telemetry_data = {}
-
     driver_args = [(session, driver_codes[driver_no]) for driver_no in session.drivers]
 
     print(f"Processing {len(session.drivers)} drivers in parallel...")
-    # Note: progress_callback is not used for qualifying as it uses multiprocessing
-    # and progress tracking across worker processes is complex to implement
 
     num_processes = min(cpu_count(), len(session.drivers))
-
-    # Auto-tune chunk size for optimal load distribution
-    # Aim for 4-8 chunks per worker for balanced load distribution
     num_drivers = len(session.drivers)
     chunksize = max(1, (num_drivers + num_processes * 4 - 1) // (num_processes * 4))
 
+    raw_telemetry = {}
+    max_speed = 0.0
+    min_speed = 0.0
+
     with Pool(processes=num_processes) as pool:
         results = pool.imap_unordered(_process_quali_driver, driver_args, chunksize=chunksize)
-
-        # Process results while pool is still active
         for result in results:
             driver_code = result["driver_code"]
-            telemetry_data[driver_code] = result["driver_telemetry_data"]
-
+            raw_telemetry[driver_code] = result["driver_telemetry_data"]
             if result["max_speed"] > max_speed:
                 max_speed = result["max_speed"]
             if result["min_speed"] < min_speed or min_speed == 0.0:
                 min_speed = result["min_speed"]
 
-    # Save to the compute_data directory
+    segments = {"Q1": {"duration": 0, "drivers": {}}, "Q2": {"duration": 0, "drivers": {}}, "Q3": {"duration": 0, "drivers": {}}}
+
+    for driver_code, driver_data in raw_telemetry.items():
+        for segment_name in ["Q1", "Q2", "Q3"]:
+            if segment_name in driver_data and driver_data[segment_name].get("frames"):
+                frames = driver_data[segment_name]["frames"]
+                lap_duration = float(frames[-1]["t"])
+                lap_time_ms = float(lap_duration * 1000)
+                segments[segment_name]["drivers"][driver_code] = {
+                    "frames": frames,
+                    "lap_time": lap_time_ms,
+                }
+                if lap_duration > segments[segment_name]["duration"]:
+                    segments[segment_name]["duration"] = lap_duration
+
     cache_dir.mkdir(parents=True, exist_ok=True)
-
-    with open(cache_file, "wb") as f:
-        pickle.dump({
-            "results": qualifying_results,
-            "telemetry": telemetry_data,
-            "max_speed": max_speed,
-            "min_speed": min_speed,
-        }, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-    return {
+    output_data = {
         "results": qualifying_results,
-        "telemetry": telemetry_data,
+        "driver_colors": driver_colors,
+        "segments": segments,
         "max_speed": max_speed,
         "min_speed": min_speed,
     }
+
+    with open(cache_file, "wb") as f:
+        pickle.dump(output_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return output_data
 
 
 def get_lap_telemetry(session, driver_codes: list, lap_numbers: list):
